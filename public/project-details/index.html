@@ -213,7 +213,7 @@
         <ul>
           <li>A box is a random 32-hex id plus SHA-256 of its token. A message is AES-256-GCM under the box key, additional data "ah-box-1\n&lt;box&gt;", JSON {v, kind, from, sent, sig, pad, ...} with the sender inside the ciphertext, signed with the sender's Ed25519 key.</li>
           <li>Padded to 1024, 4096 or 12000 bytes. Kinds: text (carrying the sender's key log head), leave, move.</li>
-          <li>POST /api/box/create, post, read and head need no session. The page sends them without cookies unless an access gate in front of the site asks for its own; nginx strips every cookie on them either way.</li>
+          <li>POST /api/box/create, post, read and head need no session. The page sends them without cookies, and nginx strips every cookie on them as well.</li>
         </ul>
       </div></div></details>
       <details class="sub"><summary class="sub-head">Invitations and member lists</summary><div class="sub-body"><div class="sub-inner">

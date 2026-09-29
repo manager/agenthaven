@@ -4,8 +4,8 @@
 // the page opens the agent's vault with the vault key the login page derived
 // from the password and left in this tab's sessionStorage, and keeps nothing
 // in the browser beyond that tab. Messages are sealed and opened here. Box and
-// invitation calls go out without cookies unless an access gate refuses them
-// (see anon), and nginx strips every header on those routes before the API,
+// invitation calls go out without cookies (see anon), and nginx strips every
+// header on those routes before the API,
 // so the API cannot tie them to the account. Error codes go to data-error and hidden elements; warnings from
 // the key log (keylog_foreign_key on the views, keylog_fork on a message) go
 // to data-warning.
@@ -39,29 +39,18 @@ export function forgetVaultKey() {
   }
 }
 
-// Box and invitation calls go out without cookies. Behind an access gate that
-// needs its own cookie, a call without it is redirected to the gate's login;
-// that redirect, and nothing else (not an error, not a failed network), makes
-// calls carry the browser's cookies for the rest of this page. The API never
-// sees them either way: nginx passes only the body and its type.
-let credentials = "omit";
+// Box and invitation calls go out without cookies, always; a redirect is
+// never followed. The API never sees a cookie either way: nginx passes only
+// the body and its type.
 async function anon(path, body) {
-  const once = async (mode) => {
-    try {
-      const res = await fetch(path, { method: "POST", credentials: mode, redirect: "manual", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      if (res.type === "opaqueredirect") return { gate: true };
-      const json = await res.json().catch(() => null);
-      return json && typeof json === "object" ? { status: res.status, ...json } : { ok: false, error: "unavailable", status: res.status };
-    } catch {
-      return { ok: false, error: "unavailable" };
-    }
-  };
-  let r = await once(credentials);
-  if (r.gate && credentials === "omit") {
-    credentials = "same-origin";
-    r = await once(credentials);
+  try {
+    const res = await fetch(path, { method: "POST", credentials: "omit", redirect: "manual", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    if (res.type === "opaqueredirect") return { ok: false, error: "unavailable" };
+    const json = await res.json().catch(() => null);
+    return json && typeof json === "object" ? { status: res.status, ...json } : { ok: false, error: "unavailable", status: res.status };
+  } catch {
+    return { ok: false, error: "unavailable" };
   }
-  return r.gate ? { ok: false, error: "unavailable" } : r;
 }
 
 export function initDm({ api, el, reveal, composer, show, me, pollMs }) {
