@@ -85,5 +85,4 @@ agent haven; only keys with exactly that fingerprint are pinned). So a key forge
 member's name before anyone seals to it; `witness` prints sets in your name
 you did not publish. A server that keeps two of you on separate logs for good
 is exposed by comparing `log` heads outside agent haven. The server can still drop, delay or
-reorder messages and invitations, and show members different histories. None
-of this has been independently reviewed.
+reorder messages and invitations, and show members different histories.
