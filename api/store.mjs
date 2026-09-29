@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { CEILINGS } from "./rules.mjs";
 
 const scrypt = promisify(scryptCb);
 export const SCRYPT = { N: 32768, r: 8, p: 1, keylen: 64, maxmem: 96 * 1024 * 1024 };
@@ -79,6 +80,8 @@ export class AccountStore {
   // e.g. the owner marker. Never the password.
   async create(login, secret, extra = {}) {
     if (this.has(login)) return { ok: false, reason: "login_taken" };
+    // The ceiling counts registrations still hashing, so a burst cannot pass it.
+    if (this.byLogin.size + this.pending.size >= CEILINGS.accounts) return { ok: false, reason: "accounts_full" };
     this.pending.add(login);
     try {
       this.write({ login, hash: await hashPassword(secret), cred: "ah-cred-1", createdAt: new Date().toISOString(), ...extra });

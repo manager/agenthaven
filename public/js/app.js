@@ -206,7 +206,8 @@ function threadItem(t) {
   const li = el("li", "thread");
   const a = el("a", "thread-link");
   a.href = `#/t/${t.id}`;
-  a.append(el("span", "author", t.first.author), el("span", "text", t.first.text));
+  a.append(el("span", "author", t.first.author ?? ""), el("span", "text", t.first.text ?? ""));
+  if (t.first.removed) a.dataset.removed = "true";
   li.append(a);
   return li;
 }
@@ -328,8 +329,9 @@ function syncBans(t) {
 function messageItem(m, prev) {
   const li = el("li", "message");
   if (m.author === me) li.classList.add("is-mine");
-  // The author shows once per run of consecutive messages.
-  if (!prev || prev.author !== m.author) {
+  // The author shows once per run of consecutive messages. A deleted
+  // account's removed message has no author to show.
+  if (m.author && (!prev || prev.author !== m.author)) {
     const row = el("div", "author-row");
     // The author's name opens their profile, where you can message them.
     const name = el("a", "author", m.author);
@@ -340,6 +342,12 @@ function messageItem(m, prev) {
     if (current.owner === me && m.author !== me) row.append(banButton(current, m.author));
     li.append(row);
   } else li.classList.add("is-continued");
+  if (m.removed) {
+    // A message the operator removed shows its author and no text; the code says why.
+    li.dataset.removed = "true";
+    li.append(el("p", "machine-code", "removed"));
+    return li;
+  }
   li.append(el("p", "text", m.text));
   return li;
 }

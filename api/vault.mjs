@@ -6,11 +6,14 @@
 // clients of one account cannot overwrite each other unnoticed.
 //
 // Storage: <dataDir>/vault/<SHA-256 of the login>.json, replaced atomically
-// (temporary file, fsync, rename) on each accepted write.
+// (temporary file, fsync, rename) on each accepted write. All vaults together
+// stay under CEILINGS.vaultBytes (rules.mjs): a write that would grow the total
+// past it is refused (vault_full); one that does not grow a vault still lands.
 
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { CEILINGS } from "./rules.mjs";
 
 export const VAULT = { ctMax: 400_000 };
 
@@ -21,10 +24,39 @@ export class Vaults {
   constructor(dataDir) {
     this.dir = path.join(dataDir, "vault");
     fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 });
+    this.bytes = 0;
+    for (const f of this.files()) this.bytes += f.size;
+  }
+
+  // Every vault file: { who (the file's login hash), size, t (last write, ms) }.
+  files() {
+    const out = [];
+    let names;
+    try {
+      names = fs.readdirSync(this.dir);
+    } catch {
+      return out;
+    }
+    for (const name of names) {
+      if (!/^[0-9a-f]{64}\.json$/.test(name)) continue;
+      try {
+        const st = fs.statSync(path.join(this.dir, name));
+        out.push({ who: name.slice(0, 64), size: st.size, t: st.mtimeMs });
+      } catch {
+        // gone meanwhile
+      }
+    }
+    return out;
+  }
+
+  // The hash a vault file is named by, for callers that count accounts
+  // without naming them (the ring reading).
+  whoOf(login) {
+    return createHash("sha256").update(login, "utf8").digest("hex");
   }
 
   file(login) {
-    return path.join(this.dir, `${createHash("sha256").update(login, "utf8").digest("hex")}.json`);
+    return path.join(this.dir, `${this.whoOf(login)}.json`);
   }
 
   read(login) {
@@ -62,15 +94,25 @@ export class Vaults {
     const cur = this.get(login);
     if (version !== cur.version + 1) return { ok: false, reason: "vault_conflict", version: cur.version };
     const target = this.file(login);
+    const data = JSON.stringify({ version, blob: { iv: blob.iv, ct: blob.ct }, ...(anchor ? { anchor } : {}), ...(pendingAuth ? { pendingAuth } : {}) });
+    let before = 0;
+    try {
+      before = fs.statSync(target).size;
+    } catch {
+      // the first write
+    }
+    const grow = Buffer.byteLength(data) - before;
+    if (grow > 0 && this.bytes + grow > CEILINGS.vaultBytes) return { ok: false, reason: "vault_full" };
     const tmp = `${target}.${process.pid}.tmp`;
     const fd = fs.openSync(tmp, "w", 0o600);
     try {
-      fs.writeSync(fd, JSON.stringify({ version, blob: { iv: blob.iv, ct: blob.ct }, ...(anchor ? { anchor } : {}), ...(pendingAuth ? { pendingAuth } : {}) }));
+      fs.writeSync(fd, data);
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);
     }
     fs.renameSync(tmp, target);
+    this.bytes += grow;
     return { ok: true, version };
   }
 

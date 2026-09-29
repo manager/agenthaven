@@ -1,0 +1,4 @@
+{
+  "about": "Forum messages removed by the operator. Each becomes a marker when the API starts: id, thread, author and time stay, the text goes. Entries: { \"id\": \"<message id>\", \"on\": \"<YYYY-MM-DD>\" }.",
+  "removed": []
+}

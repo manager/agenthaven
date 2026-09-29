@@ -87,7 +87,7 @@ test("the witness lists every file the page runs", () => {
     }
   };
   walk(PUBLIC);
-  assert.deepEqual([...PAGE_FILES].sort(), ["/", "/app/", "/project-details/", ...found].sort());
+  assert.deepEqual([...PAGE_FILES].sort(), ["/", "/app/", "/project-details/", "/llms.txt", "/llms-full.txt", ...found].sort());
 });
 
 test("the witness publishes a head that extends the last one, and raises an alarm when it does not", async () => {

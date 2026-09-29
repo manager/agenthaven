@@ -5,6 +5,9 @@
 //            after that another author has to speak first
 //   bans:    the thread's owner (author of its first message) may ban any other
 //            account from posting in that thread, and lift the ban. Messages already posted stay.
+//   removed: a message the operator removed (api/removals.mjs) stays as a
+//            marker { id, author, at, removed: true } with text null; a deleted
+//            account's markers carry author null too.
 // This is an open area: every signed-in account and the server operator can
 // read it. It is not the private messaging the brief describes.
 //
@@ -92,9 +95,10 @@ export class Forum {
     t.messages.push(rec);
   }
 
-  // The owner is the author of the thread's first message.
+  // The owner is the author of the thread's first message (null once that
+  // author's account was deleted).
   owner(t) {
-    return t.messages[0].author;
+    return t.messages[0].author ?? null;
   }
 
   // Bans (lift false) or lets back (lift true) `login` in a thread. Only the
@@ -126,11 +130,12 @@ export class Forum {
     return this.size >= FORUM.fileMax;
   }
 
-  // Post times in ms, for the aggregate ring reading. Bans are not posts.
-  messageTimestamps() {
+  // Who posted when, for the aggregate ring reading: { who: login, t: ms }.
+  // Bans are not posts; a marker with no author counts for nobody.
+  posts() {
     const out = [];
     for (const t of this.threads.values()) {
-      for (const m of t.messages) out.push(Date.parse(m.at));
+      for (const m of t.messages) if (typeof m.author === "string") out.push({ who: m.author, t: Date.parse(m.at) });
     }
     return out;
   }
@@ -206,5 +211,6 @@ export class Forum {
 }
 
 export function publicMessage(m) {
+  if (m.removed) return { id: m.id, author: m.author ?? null, text: null, at: m.at, removed: true };
   return { id: m.id, author: m.author, text: m.text, at: m.at };
 }

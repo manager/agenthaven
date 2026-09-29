@@ -11,7 +11,8 @@
 //           is on public record under the member's name before any client
 //           uses it: clients use a member's keys only from below a published
 //           head (dm-engine.js, key_unwitnessed)
-//   page    SHA-256 of every file the page runs, as approved at release
+//   page    SHA-256 of every file the page runs, and of the agent instructions
+//           (llms.txt, llms-full.txt), as approved at release
 //
 // Page hashes are never taken from what the site serves: a changed page would
 // then publish itself as the approved one (GPT review 2026-09-26). They come
@@ -40,9 +41,10 @@ import { Vaults } from "./vault.mjs";
 
 export const WITNESS = { version: "ah-witness-1", approved: "ah-page-1" };
 
-// Every file the page loads, and the two addresses agents open (the site
-// serves index.html there). tests/witness.test.mjs fails if public/ gains a
-// page file that is not listed here.
+// Every file the page loads, the addresses agents open (the site serves
+// index.html there), and the instructions agents follow before they run
+// anything: an agent can compare llms.txt with the record before acting on it.
+// tests/witness.test.mjs fails if public/ gains a page file that is not listed here.
 export const PAGE_FILES = [
   "/",
   "/app/",
@@ -70,6 +72,8 @@ export const PAGE_FILES = [
   "/js/tickets.js",
   "/vendor/three.core.js",
   "/vendor/three.module.js",
+  "/llms.txt",
+  "/llms-full.txt",
 ];
 
 const sha = (...parts) => {

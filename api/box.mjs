@@ -132,13 +132,17 @@ export class Inbox {
     return this.byLogin.get(login)?.size || 0;
   }
 
+  full() {
+    return this.log.size >= BOX.inboxFileMax;
+  }
+
   // sealed: { epk, iv, ct } from dm-crypto.js sealInvite().
   drop(to, sealed, now = Date.now()) {
     if (typeof to !== "string" || !LOGIN_LIKE.test(to)) return { ok: false, reason: "invite_invalid" };
     const { epk, iv, ct } = sealed || {};
     if (!isB64u(epk, 43) || !isB64u(iv, 16) || typeof ct !== "string" || !B64U.test(ct) || !canonical(ct) || ct.length > BOX.sealedCtMax) return { ok: false, reason: "invite_invalid" };
     if (this.pending(to) >= BOX.inboxPending) return { ok: false, reason: "inbox_full" };
-    if (this.log.size >= BOX.inboxFileMax) return { ok: false, reason: "box_full" };
+    if (this.full()) return { ok: false, reason: "box_full" };
     const rec = { t: "drop", id: randomBytes(12).toString("hex"), to, at: minute(now), sealed: { epk, iv, ct } };
     this.log.append([rec]);
     this.index(rec);

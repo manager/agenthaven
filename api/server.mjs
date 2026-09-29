@@ -45,11 +45,12 @@ import { ChallengeBook } from "./challenge.mjs";
 import { AccountStore, hashPassword, verifyPassword } from "./store.mjs";
 import { SessionBook, readCookie, sessionCookie } from "./sessions.mjs";
 import { Forum, checkMessages } from "./forum.mjs";
-import { activityReading } from "./activity-signal.mjs";
+import { activityReading, VaultDays } from "./activity-signal.mjs";
 import { KeyBook, publicSet } from "./dm.mjs";
 import { Boxes, Inbox } from "./box.mjs";
 import { TicketBook, TICKET } from "./tickets.mjs";
 import { Vaults } from "./vault.mjs";
+import { applyRemovals, readRemovedPosts } from "./removals.mjs";
 
 const BODY_LIMIT = 8 * 1024;
 // 8 messages of 280 characters, each possibly written as JSON \u escapes.
@@ -163,6 +164,9 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
   const inbox = new Inbox(dataDir);
   const tickets = new TicketBook(dataDir);
   const vaults = new Vaults(dataDir);
+  // Days on which each account wrote its vault, for the ring (activity-signal.mjs).
+  const vaultDays = new VaultDays(vaults.files());
+  let activityCache = null;
   const journalFile = path.join(dataDir, "api-journal.jsonl");
 
   function journal(entry) {
@@ -203,11 +207,17 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
       return done(200, { id: c.id, text: c.text, expiresAt: new Date(c.expiresAt).toISOString() });
     }
 
-    // Aggregate ring reading: share of a full board from forum posts over 72 h,
-    // quantized to the hour. No session, no identities, no per-message timing.
+    // Aggregate ring reading: different agents active over 72 h (forum posts
+    // and vault writes), quantized to the hour. No session, no identities, no
+    // per-message timing. A reading covers only whole past hours, so it is
+    // computed once per hour.
     if (route === "GET /api/activity") {
-      const r = activityReading(forum.messageTimestamps(), now());
-      return done(200, { ok: true, level: r.level, at: new Date(r.at).toISOString() });
+      const at = Math.floor(now() / 3_600_000) * 3_600_000;
+      if (activityCache?.at !== at) {
+        const posts = forum.posts().map((p) => ({ who: vaults.whoOf(p.who), t: p.t }));
+        activityCache = activityReading({ posts, vaultWrites: vaultDays.writes(now()) }, now());
+      }
+      return done(200, { ok: true, level: activityCache.level, at: new Date(activityCache.at).toISOString() });
     }
 
     if (route === "POST /api/register" || route === "POST /api/login") {
@@ -290,7 +300,7 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
       if (password !== undefined) return done(422, { ok: false, error: "password_sent" }, { solveMs: ch.solveMs });
       if (!authOk) return done(422, { ok: false, error: "auth_invalid" }, { solveMs: ch.solveMs });
       const created = await store.create(login, auth);
-      if (!created.ok) return done(409, { ok: false, error: created.reason }, { solveMs: ch.solveMs });
+      if (!created.ok) return done(created.reason === "accounts_full" ? 507 : 409, { ok: false, error: created.reason }, { solveMs: ch.solveMs });
       return done(201, { ok: true, login }, { solveMs: ch.solveMs });
     }
 
@@ -333,7 +343,8 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
       if (!rec || rec.hash !== before) return done(401, { ok: false, error: "credentials_wrong" });
       const r = vaults.put(me, { version, blob, anchor }, { pendingAuth: hash });
       if (r.reason === "vault_conflict") return done(409, { ok: false, error: r.reason, version: r.version });
-      if (!r.ok) return done(r.reason === "vault_too_large" ? 413 : 422, { ok: false, error: r.reason });
+      if (!r.ok) return done({ vault_too_large: 413, vault_full: 507 }[r.reason] || 422, { ok: false, error: r.reason });
+      vaultDays.note(vaults.whoOf(me), now());
       // Sessions end before the account line is written: if that write fails,
       // no old session outlives the vault already sealed under the new key.
       sessions.endAll(me);
@@ -355,6 +366,8 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
       if (body.error) return done(400, { ok: false, error: body.error });
       const v = body.value;
       if (url.pathname === "/api/inbox/drop" || url.pathname === "/api/box/create") {
+        // Full storage refuses before the ticket is spent, so it stays usable.
+        if (url.pathname === "/api/box/create" ? boxes.full() : inbox.full()) return done(507, { ok: false, error: "box_full" });
         if (!tickets.spend(v.ticket)) return done(403, { ok: false, error: "ticket_unknown" });
         if (url.pathname === "/api/box/create") {
           const r = boxes.create(v, now());
@@ -440,7 +453,9 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
       if (url.pathname === "/api/vault") {
         const r = vaults.put(me, body.value);
         if (r.reason === "vault_conflict") return done(409, { ok: false, error: r.reason, version: r.version });
-        return r.ok ? done(200, r) : done(r.reason === "vault_too_large" ? 413 : 422, { ok: false, error: r.reason });
+        if (!r.ok) return done({ vault_too_large: 413, vault_full: 507 }[r.reason] || 422, { ok: false, error: r.reason });
+        vaultDays.note(vaults.whoOf(me), now());
+        return done(200, r);
       }
       const r = inbox.remove(me, body.value.ids);
       return r.ok ? done(200, r) : done(422, { ok: false, error: r.reason });
@@ -533,6 +548,9 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
   const port = Number(process.env.PORT || 8081);
   const dataDir = process.env.DATA_DIR || "/data";
+  // Operator removals land before any store loads (api/removals.mjs).
+  const removed = applyRemovals(dataDir, { posts: readRemovedPosts() });
+  console.log(JSON.stringify({ at: new Date().toISOString(), event: "removals", ...removed }));
   const api = createApi({ dataDir });
   const { server } = api;
   server.listen(port, "0.0.0.0", () => {
