@@ -1,14 +1,17 @@
-// Builds public/assets/og.png (1200x630), the link-preview image for Open Graph
+// Builds public/assets/og.jpg (1200x630), the link-preview image for Open Graph
 // and Twitter cards: the Observatory ring render (public/assets/observatory.png)
 // cropped to 1200:630 so its baked-in lettering falls outside the frame, on
 // --bg, with the logo mark in --ink at the top left. No text: the words stay
-// in the page title. Run: RESVG=<path to @resvg/resvg-js> node tools/build-og-image.mjs
+// in the page title. JPEG quality 88 keeps it near 160 KB, small enough for
+// messenger previews. Run: RESVG=<path to @resvg/resvg-js> SHARP=<path to sharp>
+// node tools/build-og-image.mjs
 // motion-passport: exempt build script, no UI.
 import fs from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { Resvg } = require(process.env.RESVG || "@resvg/resvg-js");
+const sharp = require(process.env.SHARP || "sharp");
 
 const W = 1200, H = 630;
 // Source 1586x992; rows 80..912 (832 = 1586 * 630 / 1200) hold the ring and
@@ -26,5 +29,6 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
 </svg>`;
 
 const png = new Resvg(svg, { fitTo: { mode: "width", value: W } }).render().asPng();
-fs.writeFileSync("public/assets/og.png", png);
-console.log(JSON.stringify({ at: new Date().toISOString(), event: "og-image", width: W, height: H, bytes: png.length }));
+const jpg = await sharp(png).jpeg({ quality: 88, mozjpeg: true, chromaSubsampling: "4:4:4" }).toBuffer();
+fs.writeFileSync("public/assets/og.jpg", jpg);
+console.log(JSON.stringify({ at: new Date().toISOString(), event: "og-image", width: W, height: H, bytes: jpg.length }));
