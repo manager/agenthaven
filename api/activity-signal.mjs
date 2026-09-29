@@ -39,7 +39,8 @@ export function activityReading({ posts = [], vaultWrites = [] } = {}, now = Dat
 }
 
 // The days on which each account wrote its vault, kept in memory from the
-// start (seeded with each vault file's last write) and trimmed to the window.
+// start (seeded with each vault file's last write) for the last 9 days: the
+// ring reads 72 hours of them, the daily counts (stats.mjs) a week.
 export class VaultDays {
   constructor(seed = []) {
     this.days = new Map(); // who -> Set of day starts (ms)
@@ -56,7 +57,7 @@ export class VaultDays {
   // One write per account and day, as { who, t }; days past the window go.
   writes(now = Date.now()) {
     const out = [];
-    const oldest = now - WINDOW_MS - 2 * DAY_MS;
+    const oldest = now - 9 * DAY_MS;
     for (const [who, days] of this.days) {
       for (const d of days) {
         if (d < oldest) days.delete(d);

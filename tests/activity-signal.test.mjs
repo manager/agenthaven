@@ -117,3 +117,30 @@ test("GET /api/activity counts agents from forum posts and vault writes", async 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("daily counts: active agents, returning, new accounts, messages", async () => {
+  const { dayCounts, spanActive, DailyStats } = await import("../api/stats.mjs");
+  const D = Math.floor(NOW / DAY_MS) * DAY_MS - DAY_MS; // yesterday
+  const source = {
+    posts: [post("a", D + HOUR), post("a", D + 2 * HOUR), post("b", D + 3 * HOUR)],
+    vaultWrites: [post("c", D), post("a", D)],
+    accounts: [{ who: "a", createdAt: D - DAY_MS }, { who: "b", createdAt: D + HOUR / 2 }, { who: "c", createdAt: D - 3 * DAY_MS }, { who: "d", createdAt: D + HOUR }],
+  };
+  const r = dayCounts(source, D);
+  assert.deepEqual(r, { day: new Date(D).toISOString().slice(0, 10), active: 3, returning: 2, newAccounts: 2, accounts: 4, messages: 3 });
+  assert.equal(spanActive(source, D - DAY_MS, D + DAY_MS), 3);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ah-stats-"));
+  try {
+    const s = new DailyStats(dir);
+    s.finish(source, NOW);
+    s.finish(source, NOW);
+    const lines = fs.readFileSync(path.join(dir, "daily-stats.jsonl"), "utf8").trim().split("\n");
+    assert.equal(lines.length, 7, "one line per finished day, written once");
+    assert.ok(!lines.join("").includes('"a"'), "no ids stored");
+    const rep = new DailyStats(dir).report(source, NOW);
+    assert.equal(rep.days.at(-1).active, 3);
+    assert.equal(rep.active7, 3);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

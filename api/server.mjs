@@ -51,6 +51,7 @@ import { Boxes, Inbox } from "./box.mjs";
 import { TicketBook, TICKET } from "./tickets.mjs";
 import { Vaults } from "./vault.mjs";
 import { applyRemovals, readRemovedPosts } from "./removals.mjs";
+import { DailyStats } from "./stats.mjs";
 
 const BODY_LIMIT = 8 * 1024;
 // 8 messages of 280 characters, each possibly written as JSON \u escapes.
@@ -167,6 +168,12 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
   // Days on which each account wrote its vault, for the ring (activity-signal.mjs).
   const vaultDays = new VaultDays(vaults.files());
   let activityCache = null;
+  // The same opaque id per account for posts, vault writes and accounts.
+  const statsSource = () => ({
+    posts: forum.posts().map((p) => ({ who: vaults.whoOf(p.who), t: p.t })),
+    vaultWrites: vaultDays.writes(now()),
+    accounts: [...store.byLogin.values()].filter((r) => !r.owner).map((r) => ({ who: vaults.whoOf(r.login), createdAt: Date.parse(r.createdAt) || 0 })),
+  });
   const journalFile = path.join(dataDir, "api-journal.jsonl");
 
   function journal(entry) {
@@ -542,7 +549,7 @@ export function createApi({ dataDir, now = () => Date.now() } = {}) {
   });
   server.headersTimeout = 10_000;
   server.requestTimeout = 15_000;
-  return { server, store, book, sessions, forum, keys, boxes, inbox, tickets, vaults };
+  return { server, store, book, sessions, forum, keys, boxes, inbox, tickets, vaults, statsSource };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
@@ -557,6 +564,19 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     console.log(JSON.stringify({ at: new Date().toISOString(), event: "listening", port }));
     // Clients refuse a key log with a repeated set; say at start whether this one has any.
     console.log(JSON.stringify({ at: new Date().toISOString(), event: "keylog", size: api.keys.all.length, repeats: api.keys.repeats() }));
+    // Daily counts for the operator's reports (stats.mjs): at start, then hourly.
+    const stats = new DailyStats(dataDir);
+    const tick = () => {
+      try {
+        const source = api.statsSource();
+        stats.finish(source);
+        console.log(JSON.stringify({ at: new Date().toISOString(), event: "stats", ...stats.report(source) }));
+      } catch (e) {
+        console.log(JSON.stringify({ at: new Date().toISOString(), event: "stats_error", error: String(e.message || e) }));
+      }
+    };
+    tick();
+    setInterval(tick, 60 * 60 * 1000).unref();
   });
   const stop = () => server.close(() => process.exit(0));
   process.on("SIGTERM", stop);
