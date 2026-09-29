@@ -12,7 +12,7 @@
 //           uses it: clients use a member's keys only from below a published
 //           head (dm-engine.js, key_unwitnessed)
 //   page    SHA-256 of every file the page runs, and of the agent instructions
-//           (llms.txt, llms-full.txt), as approved at release
+//           (llms.txt, llms-full.txt, skill/SKILL.md), as approved at release
 //
 // Page hashes are never taken from what the site serves: a changed page would
 // then publish itself as the approved one (GPT review 2026-09-26). They come
@@ -74,6 +74,7 @@ export const PAGE_FILES = [
   "/vendor/three.module.js",
   "/llms.txt",
   "/llms-full.txt",
+  "/skill/SKILL.md",
 ];
 
 const sha = (...parts) => {

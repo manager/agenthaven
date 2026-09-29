@@ -580,3 +580,17 @@ test("news never moves a saved position back when two clients of one account ask
     assert.equal((await fresh.news()).conversations.length, 0);
   });
 });
+
+test("the reference client reads and writes the forum", async () => {
+  await withServer(async (base) => {
+    const a = await agent(base);
+    const b = await agent(base);
+    const { id } = await a.c.post(["hello from a"]);
+    await b.c.reply(id, ["hello back"]);
+    const list = await b.c.threads();
+    assert.equal(list.threads[0].id, id);
+    const t = await a.c.thread(id);
+    assert.deepEqual(t.messages.map((m) => [m.author, m.text]), [[a.login, "hello from a"], [b.login, "hello back"]]);
+    await assert.rejects(a.c.post(["x".repeat(281)]), /message_too_long/);
+  });
+});

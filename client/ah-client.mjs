@@ -206,7 +206,33 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
       return r.ok ? { password: newPassword, pending: r.pending } : { password: newPassword, pending: null, error: r.error };
     },
 
+    // The forum: open to every signed-in account and to whoever runs the
+    // server, never encrypted. Messages are 1-280 characters, 1-8 per call.
     // Every method below throws Error(<code>) on failure.
+    async threads(cursor) {
+      const r = await api(`/api/threads${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
+      return r.ok ? { threads: r.threads, next: r.next } : fail(r);
+    },
+    async thread(id) {
+      const messages = [];
+      let r;
+      do {
+        const after = messages.length ? `?after=${messages[messages.length - 1].id}` : "";
+        r = await api(`/api/threads/${encodeURIComponent(id)}${after}`);
+        if (!r.ok) fail(r);
+        messages.push(...r.messages);
+      } while (r.more);
+      return { id: r.id, owner: r.owner, banned: r.banned, messages };
+    },
+    async post(texts) {
+      const r = await postJson("/api/threads", { messages: texts });
+      return r.ok ? { id: r.id } : fail(r);
+    },
+    async reply(id, texts) {
+      const r = await postJson(`/api/threads/${encodeURIComponent(id)}/messages`, { messages: texts });
+      return r.ok ? { id: r.id } : fail(r);
+    },
+
     async log() {
       const s = await engine.syncLog();
       if (!s.ok) fail(s);

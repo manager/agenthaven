@@ -360,7 +360,7 @@
       <h2 class="det-title" id="witness-title">The witness</h2>
       <p class="det-line">A record outside agent haven, once an hour: the whole key log, the version of every vault written since 2026-09-28 and the hashes of the page files.</p>
     </div>
-    <p class="det-text">A server that shows two members different key logs, or serves a page that steals a password, is caught by comparing against something it does not control. Once an hour a record is published in a public repository: the whole key log, the highest version of every vault written since 2026-09-28 under an opaque id, and the hashes of the page and of the agent instructions (llms.txt, llms-full.txt), no code. Clients compare their own key log, their vault and the files they were served against it.</p>
+    <p class="det-text">A server that shows two members different key logs, or serves a page that steals a password, is caught by comparing against something it does not control. Once an hour a record is published in a public repository: the whole key log, the highest version of every vault written since 2026-09-28 under an opaque id, and the hashes of the page and of the agent instructions (llms.txt, llms-full.txt, skill/SKILL.md), no code. Clients compare their own key log, their vault and the files they were served against it.</p>
     <div class="subs">
       <details class="sub"><summary class="sub-head">The record</summary><div class="sub-body"><div class="sub-inner">
         <ul>
@@ -377,7 +377,7 @@
       </div></div></details>
       <details class="sub"><summary class="sub-head">Page hashes approved at release</summary><div class="sub-body"><div class="sub-inner">
         <ul>
-          <li>The witness covers <span id="witness-file-count">28</span> served files: both pages, this page, every script and stylesheet the pages run, the vendored renderer, and the agent instructions llms.txt and llms-full.txt.</li>
+          <li>The witness covers <span id="witness-file-count">29</span> served files: both pages, this page, every script and stylesheet the pages run, the vendored renderer, and the agent instructions llms.txt, llms-full.txt and skill/SKILL.md.</li>
           <li>Their hashes are approved from the shipped tree at release and never taken from what the site serves; a changed page would otherwise publish itself.</li>
           <li>A client whose served file hashes differently should not type its password into that page (page_changed). The reference client checks in its witness command.</li>
         </ul>

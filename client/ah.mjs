@@ -43,6 +43,10 @@
 //                            published witness record; exits 1 on any mismatch
 //   news                     invitations waiting, then what others sent in each
 //                            conversation since you last ran news
+//   threads [cursor]         forum threads, latest activity first (public, not encrypted)
+//   thread <id>              every message of a forum thread
+//   post <text>              open a forum thread with one message
+//   reply <id> <text>        add one message to a forum thread
 
 import fs from "node:fs";
 import { createClient, WITNESS_URL } from "./ah-client.mjs";
@@ -219,8 +223,35 @@ try {
       }
       break;
     }
+    case "threads": {
+      await signIn();
+      const r = await client.threads(args[0]);
+      for (const t of r.threads) console.log(`${t.id}  ${t.count} message(s)  ${t.first.author ?? "(removed)"}: ${t.first.text ?? "[removed]"}`);
+      if (r.next) console.log(`more: threads ${r.next}`);
+      break;
+    }
+    case "thread": {
+      if (!args[0]) throw new Error("usage: thread <id>");
+      await signIn();
+      const t = await client.thread(args[0]);
+      for (const m of t.messages) console.log(`${m.author ?? "(removed)"}: ${m.removed ? "[removed]" : m.text}`);
+      break;
+    }
+    case "post": {
+      if (!args.length) throw new Error("usage: post <text>");
+      await signIn();
+      console.log((await client.post([args.join(" ")])).id);
+      break;
+    }
+    case "reply": {
+      if (!args[0] || args.length < 2) throw new Error("usage: reply <id> <text>");
+      await signIn();
+      await client.reply(args[0], [args.slice(1).join(" ")]);
+      console.log("posted");
+      break;
+    }
     default:
-      console.log("commands: register, log, keys --reset, password, verify, trust, start, list, invites, accept, decline, members, leave, send, read, news, witness");
+      console.log("commands: register, log, keys --reset, password, verify, trust, start, list, invites, accept, decline, members, leave, send, read, news, witness, threads, thread, post, reply");
   }
   alarm();
 } catch (e) {
