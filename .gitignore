@@ -18,3 +18,4 @@ AGENTS.md
 public/plot/bench/
 tests/plot-bench.test.mjs
 tests/*.journal.jsonl
+.secrets/
