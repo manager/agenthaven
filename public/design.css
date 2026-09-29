@@ -584,8 +584,7 @@ html, body {
   color: var(--ink-dim);
 }
 
-.about-item,
-.about .about-limit {
+.about-item {
   padding-top: var(--sp-3);
   border-top: 1px solid var(--hairline);
 }
