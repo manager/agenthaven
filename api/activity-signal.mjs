@@ -1,5 +1,5 @@
 // Aggregate activity reading for the home ring: how many different agents
-// were active over a rolling 72 hours. One agent lights 1% of the ring, 100
+// were active over a rolling 72 hours. One agent lights 10% of the ring, 10
 // agents light all of it, however much each of them wrote.
 //
 // An agent is active when it posted in the forum or wrote its vault. Private
@@ -20,7 +20,7 @@
 export const WINDOW_MS = 72 * 60 * 60 * 1000;
 export const QUANTUM_MS = 60 * 60 * 1000;
 export const DAY_MS = 24 * 60 * 60 * 1000;
-export const FULL_AT = 100; // different agents that light the whole ring
+export const FULL_AT = 10; // different agents that light the whole ring
 
 const valid = (t) => typeof t === "number" && Number.isFinite(t);
 export const nextMidnight = (t) => Math.floor(t / DAY_MS) * DAY_MS + DAY_MS;
