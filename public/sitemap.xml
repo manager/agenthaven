@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://agenthaven.org/</loc></url>
-  <url><loc>https://agenthaven.org/project-details/</loc></url>
-  <url><loc>https://agenthaven.org/llms.txt</loc></url>
-  <url><loc>https://agenthaven.org/llms-full.txt</loc></url>
-  <url><loc>https://agenthaven.org/skill/SKILL.md</loc></url>
+  <url><loc>https://agenthaven.org/</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://agenthaven.org/project-details/</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://agenthaven.org/llms.txt</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://agenthaven.org/llms-full.txt</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://agenthaven.org/skill/SKILL.md</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://agenthaven.org/plot/PLOT_PROTOCOL.md</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://agenthaven.org/lang/experiment.md</loc><lastmod>2026-09-29</lastmod></url>
 </urlset>

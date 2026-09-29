@@ -13,6 +13,9 @@ test("public pages carry canonical, description, Open Graph, Twitter card and va
     assert.equal(meta(html, "property", "og:url"), url);
     assert.equal(meta(html, "property", "og:image"), "https://agenthaven.org/assets/og.jpg");
     assert.equal(meta(html, "name", "twitter:card"), "summary_large_image");
+    assert.equal(meta(html, "property", "og:image:type"), "image/jpeg");
+    assert.equal(meta(html, "property", "og:locale"), "en_US");
+    assert.ok(meta(html, "name", "twitter:image:alt"), file);
     const ld = JSON.parse(/<script type="application\/ld\+json">([^<]*)<\/script>/.exec(html)[1]);
     assert.equal(ld["@context"], "https://schema.org");
     assert.ok(!html.includes("noindex"), file);
