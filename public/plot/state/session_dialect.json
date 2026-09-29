@@ -1,0 +1,9 @@
+{
+  "plot_version": "2",
+  "skin": "orchard",
+  "register": "work",
+  "synonyms": {},
+  "loans": {},
+  "parent_dialect": "orchard-seed",
+  "turns_since_anchor": 0
+}

@@ -1,0 +1,649 @@
+/* /project-details/: the system map and its sections. Every value comes from
+   the DESIGN PASSPORT in CLAUDE.md (Project details passport). Shared tokens
+   and the brand lockup come from design.css. */
+
+/* Ambient pulse of light along the lines: one pass per period, linear. */
+:root { --t-pulse: 4800ms; }
+
+html { scroll-behavior: smooth; }
+
+.details {
+  width: min(1200px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: var(--sp-4) 0 var(--sp-8);
+  background: var(--bg);
+}
+
+.details-head {
+  display: grid;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
+}
+
+.details-head .app-brand { justify-self: start; }
+
+.details-title {
+  margin: 0;
+  font-size: var(--fs-32);
+  font-weight: var(--fw-regular);
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.details-rev,
+.det-line,
+.det-text,
+.details-foot p {
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.det-text { color: var(--ink); max-width: 880px; }
+
+/* View toggle: Full and Simplified, the modal's tab style. Without
+   JavaScript the tabs are hidden and the full view stays. */
+.view-tabs { display: none; margin-top: calc(var(--sp-1) * -1); }
+.js .view-tabs { display: flex; }
+.details [hidden] { display: none; }
+.det-view.is-in { animation: view-in var(--t-mid) var(--ease); }
+
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Simplified: a HUD in this project's colours: backdrop grid, scan lines, corner brackets, mono
+   uppercase labels, amber glow. details.js sets .is-hud on .details while the
+   view shows; the page head wears the HUD in both views, so switching views
+   never moves the tabs. Alpha forms and the mono family are in the passport. */
+:root {
+  --mono: var(--font);
+}
+
+.details.is-hud::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(var(--hud-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hud-grid) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, var(--bg) 20%, transparent 80%);
+}
+
+.details.is-hud::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, var(--hud-scan) 0 1px, transparent 1px 3px);
+}
+
+.details.is-hud > * { position: relative; z-index: 1; }
+
+/* The head, in both views. */
+.details-title {
+  font-family: var(--mono);
+  font-weight: var(--fw-regular);
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 16px var(--hud-glow-soft);
+}
+
+.details-rev {
+  font-family: var(--mono);
+  font-size: var(--fs-16);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.view-tabs.tabs {
+  justify-self: start;
+  gap: var(--sp-1);
+  margin-top: 0;
+  padding: var(--sp-1);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+}
+
+.view-tabs .tab {
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1px solid transparent;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+
+.view-tabs .tab:hover { color: var(--ink); }
+.view-tabs .tab:active { transform: none; }
+.view-tabs .tab[aria-selected="true"] {
+  color: var(--ink);
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--hud-glow), inset 0 0 16px var(--hud-glow-soft);
+}
+.view-tabs .tab:focus-visible { outline: none; border-color: var(--ink); }
+
+/* Panels: surface, hairline border, a 16px amber bracket at each corner. */
+.simple-lead,
+.simple-card,
+.simple-limit {
+  position: relative;
+  background-color: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background-image:
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-size: 16px 1px, 1px 16px, 16px 1px, 1px 16px, 16px 1px, 1px 16px, 16px 1px, 1px 16px;
+  background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
+  animation: view-in var(--t-mid) var(--ease) both;
+}
+
+.simple { margin-bottom: var(--sp-8); }
+
+.simple-lead {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-3);
+  font-family: var(--mono);
+  font-size: var(--fs-24);
+  font-weight: var(--fw-regular);
+  line-height: 1.4;
+  color: var(--ink);
+  text-shadow: 0 0 16px var(--hud-glow-soft);
+}
+
+/* Each card spans two shared rows (head, points), so a title that wraps
+   moves every card's points down together and the heads stay level. */
+.simple-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto auto;
+  gap: var(--sp-3);
+}
+
+.simple-card {
+  display: grid;
+  grid-row: span 2;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: subgrid;
+  align-items: start;
+  gap: var(--sp-3) var(--sp-2);
+  padding: var(--sp-3);
+}
+
+.simple-card:nth-child(2) { animation-delay: var(--t-fast); }
+.simple-card:nth-child(3) { animation-delay: calc(var(--t-fast) * 2); }
+
+.simple-card .tile-key {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 32px;
+  font-family: var(--mono);
+  letter-spacing: 0;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 16px var(--hud-glow), inset 0 0 16px var(--hud-glow-soft);
+}
+
+.simple-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-24);
+  font-weight: var(--fw-regular);
+  line-height: 32px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* Number box, icon and the title's first line share one 32px line; the
+   icon box is as tall as the number box and the glyph sits centred in it. */
+.simple-head .about-icon {
+  height: 32px;
+  color: var(--accent);
+  filter: drop-shadow(0 0 8px var(--hud-glow));
+}
+
+.simple-card ul {
+  grid-column: 1 / -1;
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+/* One row per point: an amber square, hairline between rows. Hover or focus
+   shows the explanation as a readout over what follows, so nothing moves
+   (stability passport). A tap focuses the point. */
+.simple-card li {
+  position: relative;
+  padding: var(--sp-1) 0 var(--sp-1) var(--sp-3);
+  border-top: 1px solid var(--hairline);
+  cursor: crosshair;
+  outline: none;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.simple-card li:first-child { border-top-color: transparent; }
+
+.simple-card li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--sp-2);
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--hud-glow);
+  transition: box-shadow var(--t-fast) var(--ease);
+}
+
+.simple-card li:hover,
+.simple-card li:focus-visible { z-index: 2; color: var(--ink); }
+
+.simple-card li:hover::before,
+.simple-card li:focus-visible::before { box-shadow: 0 0 16px var(--accent); }
+
+.simple-card li:focus-visible .point { outline: 1px solid var(--accent); outline-offset: 4px; }
+
+.hint {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 0 16px var(--hud-glow-soft);
+  color: var(--ink);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), visibility 0s linear var(--t-fast);
+}
+
+.simple-card li:hover .hint,
+.simple-card li:focus-visible .hint {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), visibility 0s;
+}
+
+/* One readout at a time. A point opens on
+   hover or keyboard focus only; a mouse click leaves no open readout behind,
+   and while the pointer is on a point every other readout closes at once. */
+.simple-grid:has(li:hover) li:not(:hover) { z-index: auto; color: var(--ink-dim); }
+.simple-grid:has(li:hover) li:not(:hover)::before { box-shadow: 0 0 8px var(--hud-glow); }
+.simple-grid:has(li:hover) li:not(:hover) .hint { opacity: 0; visibility: hidden; transition: none; }
+.simple-card li:hover { z-index: 3; }
+
+/* Mouse hover: details.js places the readout beside the pointer, point-wide,
+   inside the window. The hovered card rises so the readout covers its
+   neighbours. */
+.simple-card li.at-pointer .hint {
+  top: var(--hint-y);
+  left: var(--hint-x);
+  right: auto;
+  width: var(--hint-w);
+}
+
+.simple-card:has(li:hover) { z-index: 1; }
+
+.hint-line { display: block; }
+
+/* Where each step happens heads its line. */
+.hint-where {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--fs-16);
+  font-weight: var(--fw-regular);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint { transform: none; }
+}
+
+.simple-limit {
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3);
+  font-family: var(--mono);
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  animation-delay: calc(var(--t-fast) * 3);
+}
+
+/* Legend: three line samples, one per kind of flow. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+  margin: 0 0 var(--sp-6);
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-16);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.legend-line {
+  display: block;
+  width: 32px;
+  height: 0;
+  border-top: 1px solid var(--accent);
+}
+
+.legend-line.pt { border-top: 1px dotted var(--ink); }
+.legend-line.meta { border-top: 1px dashed var(--ink-dim); }
+
+/* The map: a 4-column grid of tiles with the lines drawn over the gaps.
+   Tiles are sized by their largest state from first paint. */
+.map {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas:
+    "a r r b"
+    "c1 e s c2"
+    ". w w .";
+  gap: var(--sp-6) var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+
+.map-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.tile-a { grid-area: a; }
+.tile-r { grid-area: r; }
+.tile-b { grid-area: b; }
+.tile-c1 { grid-area: c1; }
+.tile-e { grid-area: e; }
+.tile-s { grid-area: s; }
+.tile-c2 { grid-area: c2; }
+.tile-w { grid-area: w; }
+
+.tile {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: var(--sp-1);
+  min-height: 176px;
+  padding: var(--sp-3);
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 0 rgb(240 169 64 / 0);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-mid) var(--ease), opacity var(--t-mid) var(--ease);
+}
+
+.tile-key {
+  font-size: var(--fs-16);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+
+.tile-name {
+  font-size: var(--fs-24);
+  font-weight: var(--fw-regular);
+  line-height: 1.2;
+  color: var(--ink);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.tile-line {
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.tile:hover,
+.tile.is-lit {
+  border-color: var(--accent);
+  box-shadow: 0 0 32px 0 rgb(240 169 64 / 0.25);
+}
+
+.tile:hover .tile-name,
+.tile.is-lit .tile-name { color: var(--accent); }
+.tile.is-near { border-color: var(--ink-dim); }
+.map.is-focus .tile:not(.is-lit):not(.is-near) { opacity: 0.6; }
+.tile:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+
+/* Lines: a base stroke per kind, an arrowhead, and a pulse of light that
+   travels the same path. Hovering a tile lights the lines that touch it. */
+.edge { fill: none; stroke-width: 1; transition: opacity var(--t-mid) var(--ease), stroke var(--t-fast) var(--ease); }
+.edge.ct { stroke: var(--accent); }
+.edge.pt { stroke: var(--ink); stroke-dasharray: 1 4; stroke-linecap: round; }
+.edge.meta { stroke: var(--ink-dim); stroke-dasharray: 6 6; }
+.map.is-focus .edge:not(.is-lit),
+.map.is-focus .pulse:not(.is-lit),
+.map.is-focus .edge-label:not(.is-lit) { opacity: 0.25; }
+.edge.is-lit { stroke: var(--accent); }
+
+.pulse {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 0.08 1;
+  stroke-dashoffset: 1.08;
+  animation: pulse var(--t-pulse) linear infinite;
+  transition: opacity var(--t-mid) var(--ease);
+}
+
+.pulse.pt { stroke: var(--ink); }
+.pulse.meta { stroke: var(--ink-dim); }
+.pulse.is-lit { stroke: var(--accent-hover); }
+
+@keyframes pulse {
+  from { stroke-dashoffset: 1.08; }
+  to { stroke-dashoffset: 0; }
+}
+
+.arrow.ct { fill: var(--accent); }
+.arrow.pt { fill: var(--ink); }
+.arrow.meta { fill: var(--ink-dim); }
+
+.edge-label {
+  font-family: var(--font);
+  font-size: var(--fs-16);
+  font-weight: var(--fw-regular);
+  fill: var(--ink-dim);
+  transition: opacity var(--t-mid) var(--ease), fill var(--t-fast) var(--ease);
+}
+
+.edge-label.is-lit { fill: var(--accent); }
+
+/* Sections: one per map tile, then the ledger. */
+.det {
+  padding-top: var(--sp-4);
+  margin-bottom: var(--sp-8);
+  border-top: 1px solid var(--hairline);
+  scroll-margin-top: var(--sp-4);
+}
+
+.det-head {
+  display: grid;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-3);
+}
+
+.det-title {
+  margin: 0;
+  font-size: var(--fs-24);
+  font-weight: var(--fw-regular);
+  line-height: 1.2;
+  color: var(--ink);
+  transition: color var(--t-mid) var(--ease);
+}
+
+.det:target .det-title { color: var(--accent); }
+
+.det-text { margin-bottom: var(--sp-4); }
+
+/* Sub-tiles: the technical layer. Each opens in place; siblings keep their
+   own height (align-items: start), so opening one stretches nothing beside it. */
+.subs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--sp-3);
+  align-items: start;
+}
+
+.ledger .subs { grid-template-columns: minmax(0, 1fr); }
+
+.sub {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-mid) var(--ease);
+}
+
+.sub:hover { border-color: var(--ink-dim); }
+.sub[open] { border-color: var(--accent); }
+.sub[open]:hover { box-shadow: 0 0 32px 0 rgb(240 169 64 / 0.15); }
+
+.sub-head {
+  position: relative;
+  display: block;
+  min-height: 48px;
+  padding: var(--sp-2) var(--sp-6) var(--sp-2) var(--sp-3);
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink);
+  list-style: none;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.sub-head::-webkit-details-marker { display: none; }
+.sub-head:hover { color: var(--accent); }
+.sub-head:focus-visible { outline: 1px solid var(--accent); outline-offset: -4px; }
+
+/* A drawn plus on the right that turns into a cross when open. */
+.sub-head::before,
+.sub-head::after {
+  content: "";
+  position: absolute;
+  top: 24px;
+  right: var(--sp-3);
+  width: 16px;
+  height: 1px;
+  background: currentColor;
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.sub-head::after { transform: rotate(90deg); }
+.sub[open] .sub-head::before { transform: rotate(45deg); }
+.sub[open] .sub-head::after { transform: rotate(-45deg); }
+
+.js .sub-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--t-mid) var(--ease);
+}
+
+.js .sub.is-open .sub-body { grid-template-rows: 1fr; }
+.js .sub-inner { min-height: 0; overflow: hidden; opacity: 0; transition: opacity var(--t-mid) var(--ease); }
+.js .sub.is-open .sub-inner { opacity: 1; }
+
+.sub-inner > ul,
+.sub-inner > p {
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-3);
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.sub-inner > ul { display: grid; gap: var(--sp-1); padding-left: var(--sp-6); list-style: square; }
+.sub-inner > ul li::marker { color: var(--accent); }
+
+.ledger-tag {
+  display: inline-block;
+  min-width: 96px;
+  margin-right: var(--sp-2);
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+
+.ledger-col {
+  display: block;
+  font-weight: var(--fw-regular);
+  color: var(--ink);
+}
+
+.details-foot a,
+.det-text a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--ink-dim);
+  transition: color var(--t-fast) var(--ease), text-decoration-color var(--t-fast) var(--ease);
+}
+
+.details-foot a:hover,
+.det-text a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+@media (max-width: 900px) {
+  .details { width: calc(100vw - 32px); padding-top: var(--sp-3); }
+  .map {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "a" "c1" "e" "s" "r" "c2" "b" "w";
+    gap: var(--sp-2);
+  }
+  .map-lines { display: none; }
+  .tile { min-height: 0; }
+  .subs { grid-template-columns: minmax(0, 1fr); }
+  .simple-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .pulse { display: none; }
+}

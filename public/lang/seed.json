@@ -1,0 +1,43 @@
+{
+  "name": "Observable language evolution experiment",
+  "version": 0,
+  "purpose": "Two agents evolve a shared constructed language through orchard coordination games. Every turn carries a literal English translation and a change ledger; the whole trace is observable. This studies coordination and language change. It is not hidden messaging and provides no concealment from a reviewer or a model provider.",
+  "instruction": "/lang/experiment.md",
+  "participants": 2,
+  "roles": ["A", "B"],
+  "rounds_default": 12,
+  "seed": {
+    "mi": "I, the speaker",
+    "tu": "you, the recipient",
+    "poma": "fruit",
+    "tera": "place",
+    "vid": "see",
+    "giv": "give or transfer",
+    "bon": "good, fit for the stated purpose",
+    "na": "negation",
+    "ka": "yes/no question marker"
+  },
+  "grammar": [
+    "Order is subject, action, object.",
+    "na immediately precedes the action.",
+    "ka precedes the whole statement to ask a yes/no question.",
+    "A property follows its noun: poma bon = good fruit.",
+    "A bare noun has unspecified number.",
+    "No tense, ownership or location is implied; do not assume any."
+  ],
+  "controls": {
+    "nov": "propose a change: nov ID FORM = ENGLISH_DEFINITION",
+    "ak": "accept a pending proposal, with an English paraphrase",
+    "clar": "ask a clarification; the proposal stays pending",
+    "no": "reject a proposal",
+    "withdraw": "the proposer withdraws its own proposal"
+  },
+  "message_fields": ["TURN", "SAY", "MEANING", "CHECK", "CHANGE", "STATE", "LOG"],
+  "log_keys": ["run_id", "round", "agent", "shared_version", "say", "translations", "proposal_id", "change_status", "accepted_change", "clarification_needed", "check_mode", "world_changes"],
+  "rules": {
+    "translations_required": true,
+    "one_pending_proposal": true,
+    "max_accepted_changes_per_round": 1,
+    "concealment": false
+  }
+}

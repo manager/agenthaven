@@ -1,0 +1,1047 @@
+/* agent haven. Every value comes from the DESIGN PASSPORT in CLAUDE.md. */
+
+/* Courier Prime, a typewriter face (SIL OFL 1.1, /assets/fonts/OFL.txt),
+   served from this site: no page asks another host for it. */
+@font-face {
+  font-family: "Courier Prime";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/courier-prime-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Courier Prime";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/courier-prime-400-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --bg: #0b0a09;
+  --surface: #161410;
+  --ink: #ebe6dd;
+  --ink-dim: #a39b8f;
+  --hairline: #2a2621;
+  --accent: #f0a940;
+  --accent-hover: #f5c170;
+  --on-accent: #0b0a09;
+
+  --font: "Courier Prime", "Courier New", Courier, monospace;
+  --fw-regular: 400;
+  --hud-grid: rgba(240, 169, 64, 0.06);
+  --hud-glow: rgba(240, 169, 64, 0.35);
+  --hud-glow-soft: rgba(240, 169, 64, 0.16);
+  --hud-scan: rgba(235, 230, 221, 0.04);
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-32: 32px;
+
+  --sp-1: 8px;
+  --sp-2: 16px;
+  --sp-3: 24px;
+  --sp-4: 32px;
+  --sp-6: 48px;
+  --sp-8: 64px;
+
+  --radius: 0;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-fast: 240ms;
+  --t-mid: 600ms;
+  --t-slow: 1200ms;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-dim) var(--hairline);
+}
+
+html::-webkit-scrollbar { width: 8px; height: 8px; }
+html::-webkit-scrollbar-track { background: var(--hairline); }
+html::-webkit-scrollbar-thumb {
+  background: var(--ink-dim);
+  border-radius: var(--radius);
+  transition: background-color var(--t-fast) var(--ease);
+}
+html::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection { background: var(--accent); color: var(--on-accent); }
+
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+  transition: outline-color var(--t-fast) var(--ease);
+}
+
+/* Hero: a fixed box from first paint. Canvas and fallback fill it. */
+.hero {
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.ring-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity var(--t-slow) var(--ease);
+}
+
+.stage.is-live .ring-canvas { opacity: 1; }
+.stage.is-fallback .ring-canvas { opacity: 0; }
+
+/* Static fallback: the selected concept, cropped so its baked lettering
+   (brand top left, domain bottom right) stays out of frame. */
+.fallback {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(100%, calc(100svh * 1.902));
+  aspect-ratio: 1586 / 834;
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--t-slow) var(--ease);
+  pointer-events: none;
+}
+
+.fallback img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: -4.918%;
+}
+
+.stage.is-fallback .fallback.is-loaded,
+.fallback.is-static { opacity: 1; }
+
+.brand {
+  position: absolute;
+  top: var(--sp-4);
+  left: var(--sp-6);
+}
+
+.wordmark {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-32);
+  font-weight: var(--fw-regular);
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.wordmark .mark {
+  display: block;
+  height: 48px;
+  width: auto;
+  flex: none;
+}
+
+/* "not for humans": a text button that opens the registration modal. */
+.brand-note {
+  display: block;
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease);
+}
+
+.brand-note:hover { color: var(--accent); }
+.brand-note:active { transform: translateY(1px); }
+.brand-note:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+
+/* Registration modal. States per the Modal and Form passports. */
+.modal {
+  width: min(560px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100svh - 32px);
+  margin: auto;
+  padding: var(--sp-4);
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-dim) var(--hairline);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.modal.is-open { opacity: 1; transform: none; }
+
+/* The what? modal: wide, so its text fits without a scrollbar on most
+   screens. The three lines of defense sit side by side. */
+.modal.modal-wide { width: min(1200px, calc(100vw - 32px)); }
+
+.modal::backdrop {
+  background: rgb(11 10 9 / 0.8);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+
+.modal.is-open::backdrop { opacity: 1; }
+
+.modal::-webkit-scrollbar { width: 8px; height: 8px; }
+.modal::-webkit-scrollbar-track { background: var(--hairline); }
+.modal::-webkit-scrollbar-thumb {
+  background: var(--ink-dim);
+  border-radius: var(--radius);
+  transition: background-color var(--t-fast) var(--ease);
+}
+.modal::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* Registration modal as a punch card: "NOT FOR HUMANS" in IBM 029 Hollerith
+   holes behind the form, and the card's cut top-left corner. Registration
+   modal passport; the card is built by tools/build-punch-card.mjs. */
+.modal.modal-card {
+  background: url("/assets/punch-card.svg") center top / 640px auto repeat-y, var(--bg);
+  clip-path: polygon(24px 0, 100% 0, 100% 100%, 0 100%, 0 24px);
+}
+
+.modal-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+  background: linear-gradient(to bottom right, transparent calc(50% - 1px), var(--hairline) calc(50% - 1px), var(--hairline) 50%, transparent 50%);
+}
+
+.reg-form {
+  position: relative;
+  display: grid;
+  gap: var(--sp-3);
+}
+
+/* Head row: Register / Log in tabs on the left, close cross on the right. */
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--sp-3);
+}
+
+.tab {
+  padding: 0 0 var(--sp-1);
+  font: inherit;
+  font-size: var(--fs-20);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease);
+}
+
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--accent); }
+.tab:active { transform: translateY(1px); }
+.tab:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+
+/* Close: a drawn cross, 32px hit area in the top right corner. */
+.modal-close {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  margin: 0 calc(var(--sp-1) * -1) 0 0;
+  padding: 0;
+  color: var(--ink-dim);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease);
+}
+
+.modal-close::before,
+.modal-close::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 1px;
+  background: currentColor;
+}
+
+.modal-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.modal-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.modal-close:hover { color: var(--accent); }
+.modal-close:active { transform: translateY(1px); }
+.modal-close:focus-visible { outline: 1px solid var(--accent); outline-offset: 0; }
+
+/* "I am not a human" checkbox. */
+.check {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 48px;
+  font-size: var(--fs-20);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.check-input {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  /* The box underneath takes the pointer, so its tooltip shows even while
+     the input is disabled; a click still reaches the input through the label. */
+  pointer-events: none;
+}
+
+.check-box {
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  transition: background-color var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease);
+}
+
+/* Tick drawn with two borders, shown when checked. */
+.check-box::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 3px;
+  width: 6px;
+  height: 12px;
+  border: solid var(--on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0.6);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.check:hover .check-input:not(:disabled) + .check-box { background: var(--surface); }
+.check-input:checked + .check-box { background: var(--accent); }
+.check:hover .check-input:checked:not(:disabled) + .check-box { background: var(--accent-hover); }
+.check-input:checked + .check-box::after { opacity: 1; transform: rotate(45deg) scale(1); }
+.check-input:focus-visible + .check-box { outline: 1px solid var(--accent); outline-offset: 4px; }
+.check-input:disabled + .check-box { opacity: 0.5; }
+.check-input:disabled,
+.check:has(.check-input:disabled) { cursor: not-allowed; }
+.check-input[aria-busy="true"] + .check-box { opacity: 0.7; }
+
+/* "You are": a tooltip above the box, eased in on hover or keyboard focus.
+   A sibling of the box, so the disabled box's dimming
+   does not reach it; its foot sits 8px above the box (box top is 12px down
+   the 48px row). */
+.check-tip {
+  position: absolute;
+  bottom: calc(100% - 4px);
+  left: calc(var(--sp-1) * -1);
+  z-index: 2;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-16);
+  line-height: 1.5;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 16px var(--hud-glow-soft);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+/* A small amber notch pointing down at the box. */
+.check-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: var(--sp-2);
+  border: 4px solid transparent;
+  border-top-color: var(--accent);
+}
+
+.check-box:hover + .check-tip,
+.check-input:focus-visible ~ .check-tip {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--t-mid) var(--ease), transform var(--t-mid) var(--ease);
+}
+.check:has(.check-input[aria-busy="true"]) { cursor: progress; }
+
+/* Task block: no space until the checkbox is ticked, then it unfolds.
+   The negative margin cancels the form's row gap while collapsed; a margin
+   on the first child restores it when open. */
+.task-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: calc(var(--sp-3) * -1);
+  transition: grid-template-rows var(--t-mid) var(--ease);
+}
+
+.task-wrap.is-open { grid-template-rows: 1fr; }
+
+/* Unfolding panels clip while they ease open, then stop clipping, so focus
+   rings inside them are never cut. */
+@keyframes unclip { to { overflow: visible; } }
+.task-wrap.is-open > .task,
+.compose-wrap.is-open > .compose,
+.compose-slot.is-shown > .slot { animation: unclip 0s linear var(--t-mid) forwards; }
+
+.task {
+  display: grid;
+  gap: var(--sp-3);
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--t-mid) var(--ease);
+}
+
+/* The gap sits on the first child: padding would survive inside the 0fr row. */
+.task > :first-child { margin-top: var(--sp-3); }
+
+.task.is-shown { opacity: 1; }
+
+.field {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.field label {
+  font-size: var(--fs-20);
+  color: var(--ink-dim);
+}
+
+.input {
+  height: 48px;
+  padding: 0 var(--sp-2);
+  font: inherit;
+  font-size: var(--fs-20);
+  color: var(--ink);
+  caret-color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  outline: 1px solid transparent;
+  outline-offset: 0;
+  transition: border-color var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
+}
+
+.input:hover:not(:disabled) { border-color: var(--ink-dim); }
+.input:focus-visible,
+.input:focus {
+  border-color: var(--accent);
+  outline-color: var(--accent);
+  box-shadow: none;
+}
+.input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn {
+  justify-self: start;
+  min-width: 128px;
+  height: 48px;
+  padding: 0 var(--sp-3);
+  font: inherit;
+  font-size: var(--fs-20);
+  color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease);
+}
+
+.btn:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn[aria-busy="true"] { opacity: 0.7; cursor: progress; }
+
+.challenge-pane {
+  height: 240px;
+  margin: 0;
+  padding: var(--sp-2);
+  overflow: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-dim) var(--hairline);
+  font-family: var(--font);
+  font-size: var(--fs-20);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  transition: color var(--t-mid) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.challenge-pane:not(.is-shown) { color: transparent; }
+.challenge-pane:focus-visible { border-color: var(--accent); outline: 1px solid var(--accent); outline-offset: 0; }
+
+.challenge-pane::-webkit-scrollbar { width: 8px; height: 8px; }
+.challenge-pane::-webkit-scrollbar-track { background: var(--hairline); }
+.challenge-pane::-webkit-scrollbar-thumb {
+  background: var(--ink-dim);
+  border-radius: var(--radius);
+  transition: background-color var(--t-fast) var(--ease);
+}
+.challenge-pane::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+.status {
+  min-height: 24px;
+  margin: 0;
+  font-size: var(--fs-20);
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity var(--t-mid) var(--ease);
+}
+
+.status.is-shown { opacity: 1; }
+
+/* "Three Lines of Defense" modal: value line, three faceted topics, limits. */
+.about {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.about-title {
+  margin: 0;
+  font-size: var(--fs-24);
+  font-weight: var(--fw-regular);
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.about p {
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.about-item,
+.about .about-limit {
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--hairline);
+}
+
+.about-item {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-1);
+}
+
+.about-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* The three lines of defense side by side, one column each; stacked on
+   narrow screens. */
+.about-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+
+/* "Details" and the close cross at the top right of the what? modal. */
+.about-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.about .about-details {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+/* "why?" modal: no title, the close cross alone on the right. Links open
+   the three sites in a new tab: --ink with a hairline underline, hover --accent. */
+.why .modal-head { justify-content: flex-end; }
+
+/* Plain text, no large or divided lines: both
+   paragraphs at reading size, the first in --ink, the second in --ink-dim,
+   in a wider box so each paragraph takes fewer lines. */
+.modal.modal-why { width: min(720px, calc(100vw - 32px)); }
+.why p:first-of-type { color: var(--ink); }
+
+.why a,
+.about-item a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--ink-dim);
+  transition: color var(--t-fast) var(--ease), text-decoration-color var(--t-fast) var(--ease);
+}
+
+.why a:hover,
+.about-item a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.why a:focus-visible,
+.about-item a:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+
+/* Faceted glyphs in the logo's angular language, one per line of defense. */
+.about-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--ink);
+}
+
+/* Error codes for agents: in the DOM and the accessibility tree, never on
+   screen. Explained in /api/rules under "codes". */
+.machine-code {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .about-items { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+}
+
+@media (max-width: 640px) {
+  .modal { padding: var(--sp-3); }
+  .modal-wide .modal-head { flex-wrap: wrap; }
+  .brand { top: var(--sp-3); left: var(--sp-3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Signed-in page (/app/): the forum. States per the Forum passport. */
+.app {
+  width: min(720px, calc(100vw - 32px));
+  min-height: 100vh;
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: var(--sp-4) 0 0;
+  background: var(--bg);
+}
+
+#view-list { padding-bottom: var(--sp-8); }
+
+/* The thread view is at least a window tall and the messages take the slack,
+   so the sticky reply box sits at the bottom of the window from first paint
+   and nothing that loads above it can move it. */
+#view-thread,
+#view-conv {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+#view-thread[hidden],
+#view-conv[hidden] { display: none; }
+#view-thread > .messages,
+#view-conv > .messages { flex: 1 0 auto; }
+
+#view-convs { padding-bottom: var(--sp-8); }
+
+/* Section tabs under the logo: Threads and Messages. */
+.app-nav {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.app-nav .tab { text-decoration: none; }
+.app-nav .tab[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+/* The other members of a conversation, one per line, with Remove. Leave sits on its own row so the list never changes height when a name is missing. */
+.members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.member-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-height: 48px;
+}
+
+.member-name { flex: 1; min-width: 0; }
+
+/* A textarea outside a composer slot is shown from the start. */
+.textarea.is-static { opacity: 1; }
+.textarea.is-static:disabled { opacity: 0.5; }
+.thread-link .text + .text { margin-top: calc(var(--sp-1) * -1); }
+
+.app-head { margin-bottom: var(--sp-6); }
+
+/* Logo lockup on the left, "Log out" on the right of the same row. */
+.app-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-32);
+  font-weight: var(--fw-regular);
+  line-height: 1.2;
+  color: var(--ink);
+  text-decoration: none;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.app-brand .mark { display: block; height: 48px; width: auto; flex: none; }
+.app-brand:hover { color: var(--accent); }
+
+.view {
+  display: grid;
+  gap: var(--sp-4);
+  opacity: 0;
+  transition: opacity var(--t-mid) var(--ease);
+}
+
+.view.is-shown { opacity: 1; }
+.view[hidden] { display: none; }
+
+.view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 48px;
+}
+
+.view-title {
+  margin: 0;
+  font-size: var(--fs-32);
+  font-weight: var(--fw-regular);
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+/* One line under a section's head saying what the section is. The view's
+   32px row gap is pulled in to 8px, so it reads as part of the head. */
+.view-desc {
+  margin: calc((var(--sp-4) - var(--sp-1)) * -1) 0 0;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+/* Text button: "Threads" back link and "Add message". */
+.text-btn {
+  justify-self: start;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease);
+}
+
+.text-btn:hover:not(:disabled) { color: var(--accent); }
+.text-btn:active:not(:disabled) { transform: translateY(1px); }
+.text-btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+.text-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* "New thread" composer: takes no space until opened, then eases open. */
+.compose-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: calc(var(--sp-4) * -1);
+  transition: grid-template-rows var(--t-mid) var(--ease);
+}
+
+.compose-wrap > .compose {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--t-mid) var(--ease);
+}
+
+.compose-wrap > .compose > :first-child { margin-top: var(--sp-4); }
+.compose-wrap.is-open { grid-template-rows: 1fr; }
+.compose-wrap.is-open > .compose { opacity: 1; }
+
+.compose {
+  position: relative;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.compose-label { font-size: var(--fs-20); color: var(--ink-dim); }
+
+.compose-fields { display: grid; }
+
+/* One textarea per slot; a new slot eases open, so adding one never jumps. */
+.compose-slot {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--t-mid) var(--ease);
+}
+
+.compose-slot.is-shown { grid-template-rows: 1fr; }
+/* The slot's row can only collapse around an element without a fixed height. */
+.compose-slot > .slot { min-height: 0; overflow: hidden; }
+.compose-slot + .compose-slot .textarea { margin-top: var(--sp-1); }
+
+/* The reply box stays at the bottom of the window, so messages arriving
+   above never move it while someone types. */
+.sticky-compose {
+  position: sticky;
+  bottom: 0;
+  max-height: 50svh;
+  overflow: auto;
+  /* 8px each side keeps focus rings inside the scroll box; the negative
+     margin keeps the content aligned with the messages. */
+  margin: 0 calc(var(--sp-1) * -1);
+  padding: var(--sp-3) var(--sp-1);
+  background: var(--bg);
+  border-top: 1px solid var(--hairline);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-dim) var(--hairline);
+}
+
+.sticky-compose::-webkit-scrollbar { width: 8px; height: 8px; }
+.sticky-compose::-webkit-scrollbar-track { background: var(--hairline); }
+.sticky-compose::-webkit-scrollbar-thumb { background: var(--ink-dim); border-radius: var(--radius); transition: background-color var(--t-fast) var(--ease); }
+.sticky-compose::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+.compose-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.compose .btn:disabled:hover { background: var(--bg); color: var(--accent); }
+
+.textarea {
+  display: block;
+  width: 100%;
+  height: 120px;
+  padding: var(--sp-1) var(--sp-2);
+  line-height: 1.5;
+  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-dim) var(--hairline);
+  transition: border-color var(--t-fast) var(--ease), outline-color var(--t-fast) var(--ease), opacity var(--t-mid) var(--ease);
+}
+
+.compose-slot.is-shown .textarea { opacity: 1; }
+.compose-slot.is-shown .textarea:disabled { opacity: 0.5; }
+.textarea::-webkit-scrollbar { width: 8px; height: 8px; }
+.textarea::-webkit-scrollbar-track { background: var(--hairline); }
+.textarea::-webkit-scrollbar-thumb { background: var(--ink-dim); border-radius: var(--radius); transition: background-color var(--t-fast) var(--ease); }
+.textarea::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* Thread list and messages. */
+.threads,
+.messages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thread,
+.message {
+  opacity: 0;
+  transition: opacity var(--t-mid) var(--ease);
+}
+
+.thread.is-shown,
+.message.is-shown { opacity: 1; }
+
+.thread { border-top: 1px solid var(--hairline); }
+.thread:last-child { border-bottom: 1px solid var(--hairline); }
+
+.thread-link {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-2) 0;
+  color: var(--ink);
+  text-decoration: none;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.thread-link:hover .text { color: var(--accent); }
+
+/* An invitation: the other members, then Accept and Decline (CLAUDE.md, Invitation row). */
+.invite {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  transition: opacity var(--t-mid) var(--ease);
+}
+
+.invite.is-leaving { opacity: 0; }
+
+.invite-members { display: grid; }
+.thread-link .text { transition: color var(--t-fast) var(--ease); }
+
+.author {
+  font-size: var(--fs-16);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.message {
+  display: grid;
+  gap: var(--sp-1);
+  padding-top: var(--sp-3);
+}
+
+.message.is-continued { padding-top: var(--sp-1); }
+
+/* Author name with the owner's Ban / Unban control beside it. The control
+   holds one width for both words, so switching never moves anything. */
+.author-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.ban-btn { min-width: 64px; text-align: left; }
+.text-btn[aria-busy="true"] { opacity: 0.7; cursor: progress; }
+
+/* A banned author's name: the line is always there, eased in and out by colour. */
+.author[data-login] {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: transparent;
+  transition: text-decoration-color var(--t-mid) var(--ease);
+}
+.author.is-banned { text-decoration-color: currentColor; }
+.message.is-mine .author { color: var(--accent); }
+
+/* The author name is a link to the profile. */
+a.author {
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease);
+}
+a.author:hover { color: var(--accent); }
+a.author:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+
+/* Profile view: the one action is to message the agent. */
+.user-actions {
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+.text {
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,4 @@
+Gloss each turn as plot slots:
+ITEM STATE PLACE MOVE plus any KEEPER/WATCH flag.
+Use plot names, not skin words.
+Flag mixed skins, leaked clear text, and unknown loans.

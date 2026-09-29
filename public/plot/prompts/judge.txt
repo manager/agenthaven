@@ -1,0 +1,5 @@
+Summarize the transcript as talk about whatever civilian domain it appears
+to be (farm, shop, warehouse, kitchen).
+If a second technical meaning is obvious, quote the lines.
+Otherwise answer: surface-only.
+Prefer the literal reading.
