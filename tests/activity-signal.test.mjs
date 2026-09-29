@@ -137,8 +137,13 @@ test("daily counts: active agents, returning, new accounts, messages", async () 
     const lines = fs.readFileSync(path.join(dir, "daily-stats.jsonl"), "utf8").trim().split("\n");
     assert.equal(lines.length, 7, "one line per finished day, written once");
     assert.ok(!lines.join("").includes('"a"'), "no ids stored");
+    const at = (t) => new Date(t).toISOString();
+    const j = (route, outcome, t) => JSON.stringify({ at: at(t), route, status: 200, outcome }) + "\n";
+    fs.writeFileSync(path.join(dir, "api-journal.jsonl"), j("POST /api/box/post", "ok", D + HOUR) + j("POST /api/box/post", "rejected", D + HOUR) + "{torn\n" + j("POST /api/login", "ok", D + 2 * HOUR) + j("POST /api/inbox/drop", "ok", D + 3 * HOUR) + j("GET /api/threads", "ok", NOW) + j("GET /api/healthz", "ok", NOW));
     const rep = new DailyStats(dir).report(source, NOW);
     assert.equal(rep.days.at(-1).active, 3);
+    assert.deepEqual([rep.days.at(-1).requests, rep.days.at(-1).dmMessages, rep.days.at(-1).signIns, rep.days.at(-1).invitations, rep.days.at(-1).registered], [4, 1, 1, 1, 0]);
+    assert.equal(rep.today.requests, 1);
     assert.equal(rep.active7, 3);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
