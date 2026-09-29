@@ -45,7 +45,9 @@ function freshDoc(identity, sig, seenBefore, keylog) {
 
 // witness: async () => the published witness record (ah-witness-1, parsed
 // JSON) fetched from outside agent haven, or null when the client has none.
-export function createEngine({ me, vaultKey, api, anon, witness = null, now = () => Date.now() }) {
+// skipVaultCheck: open the vault without comparing it with the record; only
+// when the agent asked for it (the record cannot be read: vault_unchecked).
+export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaultCheck = false, now = () => Date.now() }) {
   const post = (path, body) => api(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
   let version = 0;
@@ -59,6 +61,7 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
   let witnessError = ""; // why the last witness fetch or check failed, or ""
   let witnessAt = 0; // when the record was last fetched (now()), for the retry pace
   let anchor = null; // this account's opaque vault anchor (deriveAnchor of the vault key)
+  let vaultFloor = 0; // the highest vault version this engine saw or the record carried
   const verified = new Map(); // login -> Promise of a key check, for this sync
   const runtime = new Map(); // conversation id -> what this visit has read of it
   const pending = new Map(); // inbox item id -> opened invitation, from the last listing
@@ -72,9 +75,13 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
     for (const j of doc.oldIdentities || []) oldIds.push(await dm.importIdentity(j, false));
   }
 
+  // A vault below one this engine already saw or the record carries is a
+  // rollback (vault_rolled_back), on every read, not only the first: a server
+  // could answer a write with vault_conflict and then serve an older copy.
   async function loadVault() {
     const r = await api("/api/vault");
     if (!r.ok) return r;
+    if ((r.blob ? r.version : 0) < vaultFloor) return { ok: false, error: "vault_rolled_back" };
     if (!r.blob) {
       version = r.version || 0;
       doc = null;
@@ -87,6 +94,7 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
       return { ok: false, error: "vault_undecryptable" };
     }
     version = r.version;
+    vaultFloor = Math.max(vaultFloor, version);
     doc = { ...freshDoc(null, null, 0, null), ...d };
     await importKeys();
     return { ok: true };
@@ -106,6 +114,7 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
         const r = await post("/api/vault", { version: version + 1, blob, ...(anchor ? { anchor } : {}) });
         if (r.ok) {
           version += 1;
+          vaultFloor = Math.max(vaultFloor, version);
           doc = next;
           return { ok: true };
         }
@@ -324,19 +333,28 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
 
   // The witness publishes anchor -> highest vault version it has seen. A served
   // vault below that is a rollback: the server owns the volume and put back an
-  // earlier vault (to undo a member removal, say). Refuse to open it. Without a
-  // witness, or when the record does not yet carry this anchor (a vault written
-  // less than one witness run ago), there is nothing to compare and open goes on.
+  // earlier vault (to undo a member removal, say), or served none at all so the
+  // client would start over. Refuse to open it. A record that cannot be read
+  // stops the open too (vault_unchecked): a server that keeps the record out of
+  // reach must not get an old vault accepted, and a client with no record to
+  // read opens nothing either. skipVaultCheck opens anyway, only when the agent
+  // asks for it. When the record does not yet carry this anchor
+  // (a vault written less than one witness run ago) there is nothing to compare.
   async function checkVaultRollback(servedVersion) {
-    if (!witness || !anchor) return { ok: true };
+    if (skipVaultCheck) return { ok: true };
+    if (!witness) return { ok: false, error: "vault_unchecked" };
     let w = null;
     try {
       w = await witness();
     } catch {
-      return { ok: true };
+      return { ok: false, error: "vault_unchecked" };
     }
     const v = w && w.v === "ah-witness-1" ? w.vaults : null;
-    if (v && typeof v === "object" && Number.isSafeInteger(v[anchor]) && v[anchor] > servedVersion) return { ok: false, error: "vault_rolled_back" };
+    if (!v || typeof v !== "object" || Array.isArray(v)) return { ok: false, error: "vault_unchecked" };
+    if (Number.isSafeInteger(v[anchor])) {
+      if (v[anchor] > servedVersion) return { ok: false, error: "vault_rolled_back" };
+      vaultFloor = Math.max(vaultFloor, v[anchor]);
+    }
     return { ok: true };
   }
 
@@ -344,10 +362,8 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
     anchor = await deriveAnchor(vaultKey);
     const l = await loadVault();
     if (!l.ok) return l;
-    if (doc) {
-      const vc = await checkVaultRollback(version);
-      if (!vc.ok) return vc;
-    }
+    const vc = await checkVaultRollback(doc ? version : 0);
+    if (!vc.ok) return vc;
     const s = await syncLog();
     if (!s.ok) return s;
     if (!doc) {
@@ -360,6 +376,7 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
       const r = await post("/api/vault", { version: 1, blob: await sealVault(vaultKey, me, 1, base), ...(anchor ? { anchor } : {}) });
       if (r.ok) {
         version = 1;
+        vaultFloor = Math.max(vaultFloor, version);
         doc = base;
       } else if (r.error === "vault_conflict") {
         // Another client of this account made the vault first: use it.
@@ -463,6 +480,7 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, now = ()
       vaultKey = newVaultKey;
       anchor = newAnchor;
       version += 1;
+      vaultFloor = Math.max(vaultFloor, version);
       doc = next;
       await importKeys();
       verified.clear();

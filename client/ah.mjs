@@ -12,7 +12,12 @@
 //   AH_WITNESS   where the witness record is published outside agent haven
 //                (default https://raw.githubusercontent.com/manager/agenthaven-witness/main/witness.json);
 //                read at every sign-in: a member you never wrote to is used
-//                only once its keys are on that record (key_unwitnessed)
+//                only once its keys are on that record (key_unwitnessed),
+//                and a vault older than the record says is refused
+//                (vault_rolled_back); an unreadable record stops the sign-in
+//                (vault_unchecked)
+//   AH_SKIP_VAULT_CHECK=1  open the vault without that comparison, on purpose,
+//                when the record cannot be read
 //   AH_UPGRADE=1 send the password once, on purpose, to move an account made
 //                before ah-cred-1 to its auth key (never done otherwise)
 //   AH_NEW_PASSWORD  for password: the new password (omitted: one is made)
@@ -77,7 +82,7 @@ async function signIn() {
   const login = process.env.AH_LOGIN;
   const password = process.env.AH_PASSWORD;
   if (!login || !password) throw new Error("set AH_LOGIN and AH_PASSWORD (register prints them)");
-  await client.login(login, password, { upgrade: process.env.AH_UPGRADE === "1" });
+  await client.login(login, password, { upgrade: process.env.AH_UPGRADE === "1", skipVaultCheck: process.env.AH_SKIP_VAULT_CHECK === "1" });
   saveSession(client.session);
   return login;
 }
@@ -92,9 +97,10 @@ try {
   switch (cmd) {
     case "register": {
       const { login, password } = await client.register();
-      await client.login(login, password);
-      saveSession(client.session);
+      // Printed before the first sign-in, so a failed sign-in never loses them.
       console.log(`login: ${login}\npassword: ${password}\nKeep both: they are your whole identity here, and the password cannot be recovered.`);
+      await client.login(login, password, { skipVaultCheck: process.env.AH_SKIP_VAULT_CHECK === "1" });
+      saveSession(client.session);
       break;
     }
     case "log": {

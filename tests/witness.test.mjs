@@ -310,7 +310,49 @@ test("a served vault below the witnessed version is refused as a rollback", asyn
   });
 });
 
-test("the witness raises an alarm when a published vault version regresses, and none when an anchor rotates", async () => {
+test("a record that cannot be read opens no vault unless the agent asks; a vault the server withholds is a rollback", async () => {
+  await withSite(async ({ base, api, io, published }) => {
+    const a = await agent(base);
+    await a.c.start([]);
+    // The record cannot be read: the vault stays shut (vault_unchecked).
+    published.record = { v: "ah-witness-1" };
+    const shut = createClient({ base, witness: `${base}/__witness.json` });
+    await assert.rejects(shut.login(a.login, a.password), /vault_unchecked/);
+    const gone = createClient({ base, witness: async () => { throw new Error("unreachable"); } });
+    await assert.rejects(gone.login(a.login, a.password), /vault_unchecked/);
+    // A client made without a record opens nothing either.
+    await assert.rejects(createClient({ base }).login(a.login, a.password), /vault_unchecked/);
+    // Asked for on purpose, it opens without the comparison.
+    const asked = createClient({ base, witness: `${base}/__witness.json` });
+    await asked.login(a.login, a.password, { skipVaultCheck: true });
+    // The record carries the vault; the server then serves none, so the client
+    // would start over with fresh keys. It refuses instead.
+    published.record = (await witness({ last: null, ...io, vaultAnchors: api.vaults.anchors() })).record;
+    fs.rmSync(api.vaults.file(a.login));
+    const wiped = createClient({ base, witness: `${base}/__witness.json` });
+    await assert.rejects(wiped.login(a.login, a.password), /vault_rolled_back/);
+  });
+});
+
+test("an open client refuses an older vault served after a conflict, and a refused login keeps nothing", async () => {
+  await withSite(async ({ base, api, published }) => {
+    const a = await agent(base);
+    const file = api.vaults.file(a.login);
+    const earlier = fs.readFileSync(file);
+    await a.c.start([]);
+    // The server puts the earlier vault back under a client that is open: its
+    // next write meets vault_conflict, and the older copy is refused on reload.
+    fs.writeFileSync(file, earlier);
+    await assert.rejects(a.c.start([]), /vault_rolled_back/);
+    // A login the vault check refused leaves no engine to read from.
+    published.record = { v: "ah-witness-1" };
+    const shut = createClient({ base, witness: `${base}/__witness.json` });
+    await assert.rejects(shut.login(a.login, a.password), /vault_unchecked/);
+    assert.equal(shut.engine, null);
+  });
+});
+
+test("the witness raises an alarm when a published vault version regresses, and keeps an anchor the server stops showing", async () => {
   await withSite(async ({ io }) => {
     const anchor = "A".repeat(43);
     const last = (await witness({ last: null, ...io, vaultAnchors: [{ anchor, version: 5 }] })).record;
@@ -319,11 +361,15 @@ test("the witness raises an alarm when a published vault version regresses, and 
     const back = await witness({ last, ...io, vaultAnchors: [{ anchor, version: 3 }] });
     assert.equal(back.code, 2);
     assert.equal(back.record.alarm, "vault_rolledback");
-    // The anchor vanishing (a password change rotated the vault key) is not an
-    // alarm; the old vault no longer opening is what catches that.
+    // The anchor vanishing (a password change rotated the vault key, or the
+    // server hid it for a run) is not an alarm, and its version stays on the
+    // record: a later rollback of that vault is still caught.
     const rotated = await witness({ last, ...io, vaultAnchors: [{ anchor: "B".repeat(43), version: 1 }] });
     assert.equal(rotated.code, 0);
-    assert.equal(rotated.record.vaults[anchor], undefined);
+    assert.equal(rotated.record.vaults[anchor], 5);
+    const later = await witness({ last: rotated.record, ...io, vaultAnchors: [{ anchor, version: 3 }] });
+    assert.equal(later.code, 2);
+    assert.equal(later.record.alarm, "vault_rolledback");
   });
 });
 

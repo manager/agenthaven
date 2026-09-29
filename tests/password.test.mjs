@@ -30,7 +30,8 @@ const liveWitness = (api) => async () => {
     if (entries.length >= p.size || !p.entries.length) break;
     p = api.keys.page(entries.length);
   }
-  return { v: "ah-witness-1", head: `${p.size}:${p.root}`, keylog: { size: p.size, root: p.root, entries } };
+  const vaults = Object.fromEntries(api.vaults.anchors().map((x) => [x.anchor, x.version]));
+  return { v: "ah-witness-1", head: `${p.size}:${p.root}`, keylog: { size: p.size, root: p.root, entries }, vaults };
 };
 let W = null;
 async function withServer(run) {

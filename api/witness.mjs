@@ -165,12 +165,15 @@ export async function witness({ last, approved, page, fetchBytes, vaultAnchors =
   }
   const vaults = vaultMapOf(vaultAnchors);
   // Monotonic per anchor: a version that dropped below what was published is a
-  // rollback of that vault. An anchor that vanished is a password change (the
-  // vault key rotated), caught instead by the old vault no longer opening; it
-  // raises no alarm here.
+  // rollback of that vault. An anchor the server no longer shows keeps its last
+  // published version: a password change leaves the old anchor unused, and a
+  // server that hid an anchor for one run must not clear the way to roll that
+  // vault back (or serve none) afterwards.
   if (last?.vaults && typeof last.vaults === "object") {
     for (const [a, v] of Object.entries(last.vaults)) {
-      if (vaults[a] !== undefined && vaults[a] < v) {
+      if (!Number.isSafeInteger(v)) continue;
+      if (vaults[a] === undefined) vaults[a] = v;
+      else if (vaults[a] < v) {
         return { code: 2, record: { v: WITNESS.version, alarm: "vault_rolledback", anchor: a, published: v, served: vaults[a], at } };
       }
     }

@@ -20,7 +20,7 @@ const VAULT_SLOT = "ah-vault";
 // every open, without credentials: a member this agent never wrote to is used
 // only once its keys are on that record (key_unwitnessed).
 const WITNESS_URL = "https://raw.githubusercontent.com/manager/agenthaven-witness/main/witness.json";
-const fetchWitness = async () => (await fetch(WITNESS_URL, { credentials: "omit", cache: "no-store" })).json();
+const fetchWitness = async () => (await fetch(WITNESS_URL, { credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(20000) })).json();
 
 export function vaultKeyFor(me) {
   try {

@@ -90,7 +90,8 @@ export const WITNESS_URL = "https://raw.githubusercontent.com/manager/agenthaven
 // challenge) while the session lasts; the password is still needed for the vault.
 // witness: where the witness record is published outside agent haven (a URL,
 // or a function resolving to the parsed record); null for no witness, and then
-// keys never used before seal nothing (key_unwitnessed).
+// keys never used before seal nothing (key_unwitnessed) and the vault opens
+// only with login(..., { skipVaultCheck: true }) (vault_unchecked).
 // now: the clock (tests move it).
 export function createClient({ base = "https://agenthaven.org", session = {}, witness = null, now = () => Date.now() } = {}) {
   const fetchWitness = typeof witness === "function" ? witness : witness ? async () => (await fetch(witness, { signal: AbortSignal.timeout(20000) })).json() : null;
@@ -162,7 +163,9 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
     // never sent, whatever the server answers. upgrade: true sends it once, on
     // purpose, to move an account made before ah-cred-1 to its auth key; a
     // server that asks for it unprompted may be trying to read your vault.
-    async login(login, password, { upgrade = false } = {}) {
+    // skipVaultCheck: true opens the vault even when the witness record cannot
+    // be read (vault_unchecked), without the rollback check.
+    async login(login, password, { upgrade = false, skipVaultCheck = false } = {}) {
       const { auth, vaultKey } = await deriveCredentials(login, password);
       const s = cookie ? await api("/api/session") : { ok: false };
       if (!s.ok || s.login !== login) {
@@ -171,9 +174,13 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
       }
       me = login;
       currentAuth = auth;
-      engine = createEngine({ me, vaultKey, api, anon, now, witness: fetchWitness });
-      const o = await engine.open();
+      // The engine is kept only once its vault opened: a refused vault
+      // (vault_unchecked, vault_rolled_back) leaves nothing to read or use.
+      engine = null;
+      const e = createEngine({ me, vaultKey, api, anon, now, witness: fetchWitness, skipVaultCheck });
+      const o = await e.open();
       if (!o.ok) fail(o);
+      engine = e;
       return { login };
     },
 
