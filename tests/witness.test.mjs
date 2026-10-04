@@ -386,6 +386,17 @@ test("a record older than three hours opens no vault unless the agent asks; its 
     published.record = { ...fresh, at: new Date(now - 2 * ENGINE.witnessMaxAgeMs).toISOString() };
     assert.equal((await ok.witness(`${base}/__witness.json`)).stale, true);
     assert.equal((await ok.invitations()).length, 1);
+    // A client that keeps running past the limit reports the record it read as
+    // stale when asked, without another fetch.
+    let clock = Date.now();
+    published.record = fresh;
+    const running = createClient({ base, witness: `${base}/__witness.json`, now: () => clock });
+    await running.login(b.login, b.password);
+    assert.equal((await running.log()).witness.error, "");
+    clock += ENGINE.witnessMaxAgeMs + 60_000;
+    const late = (await running.log()).witness;
+    assert.equal(late.error, "witness_stale");
+    assert.ok(late.ageSeconds >= 3 * 3600 + 60, `age ${late.ageSeconds}`);
   });
 });
 

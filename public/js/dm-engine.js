@@ -1339,7 +1339,14 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaul
     checkWitnessRecord,
     refreshWitness,
     foreignIn,
-    witnessState: () => ({ witnessed: doc?.witnessed || null, size: witnessedSize(), error: witnessError, ...(witnessPublished || { publishedAt: null, ageSeconds: null }) }),
+    // The age is counted when asked, from the record last read: a client that
+    // keeps running past ENGINE.witnessMaxAgeMs reports witness_stale without
+    // another fetch (GPT review 2026-10-04).
+    witnessState: () => {
+      const cur = witnessPublished ? publishedOf({ at: witnessPublished.publishedAt }) : { publishedAt: null, ageSeconds: null };
+      const error = witnessError || (witnessPublished && recordStale({ at: witnessPublished.publishedAt }) ? "witness_stale" : "");
+      return { witnessed: doc?.witnessed || null, size: witnessedSize(), error, ...cur };
+    },
     changePassword,
     trust,
     resetKeys,
