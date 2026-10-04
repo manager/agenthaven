@@ -135,7 +135,9 @@ test("the reference client checks its key log and the page files against the wit
     await agent(base);
     published.record = (await witness({ last: null, ...io })).record;
     const source = `${base}/__witness.json`;
-    assert.deepEqual(await a.c.witness(source), { head: published.record.head, at: published.record.at, keylog: "ok", changed: [], foreign: [] });
+    const w = await a.c.witness(source);
+    assert.ok(Number.isSafeInteger(w.ageSeconds) && w.ageSeconds < 60, `age ${w.ageSeconds}`);
+    assert.deepEqual({ ...w, ageSeconds: 0 }, { head: published.record.head, at: published.record.at, ageSeconds: 0, stale: false, keylog: "ok", changed: [], foreign: [] });
     // The record carries the whole log, hashing to its head; entries that do not are no witness.
     assert.equal(published.record.keylog.entries.length, 2);
     const full0 = published.record;
@@ -331,6 +333,59 @@ test("a record that cannot be read opens no vault unless the agent asks; a vault
     fs.rmSync(api.vaults.file(a.login));
     const wiped = createClient({ base, witness: `${base}/__witness.json` });
     await assert.rejects(wiped.login(a.login, a.password), /vault_rolled_back/);
+  });
+});
+
+test("a record older than three hours opens no vault unless the agent asks; its key log head still counts", async () => {
+  await withSite(async ({ base, api, io, published }) => {
+    const a = await agent(base);
+    await a.c.start([]);
+    const b = await agent(base);
+    const now = Date.now();
+    const fresh = (await witness({ last: null, ...io, vaultAnchors: api.vaults.anchors() })).record;
+    // Just inside the limit: the record opens the vault.
+    published.record = { ...fresh, at: new Date(now - ENGINE.witnessMaxAgeMs + 60_000).toISOString() };
+    await createClient({ base, witness: `${base}/__witness.json` }).login(a.login, a.password);
+    // Just past it: witness_stale, with the record's time and age.
+    published.record = { ...fresh, at: new Date(now - ENGINE.witnessMaxAgeMs - 60_000).toISOString() };
+    const stale = createClient({ base, witness: `${base}/__witness.json` });
+    await assert.rejects(stale.login(a.login, a.password), (e) => e.message === "witness_stale" && e.publishedAt === published.record.at && e.ageSeconds >= 3 * 3600 + 60 && e.ageSeconds < 3 * 3600 + 120);
+    // The witness command still reports on a client whose vault did not open: the
+    // record's age and the page files, with the key log comparison left out.
+    const refused = await stale.witness(`${base}/__witness.json`);
+    assert.deepEqual([refused.stale, refused.keylog, refused.changed, refused.foreign], [true, "unchecked", [], []]);
+    assert.ok(refused.ageSeconds >= 3 * 3600 + 60);
+    // A record whose entries do not hash to its head is no witness there either.
+    published.record = { ...fresh, at: new Date(now).toISOString(), head: "not-a-head" };
+    await assert.rejects(stale.witness(`${base}/__witness.json`), /witness_unreadable/);
+    published.record = { ...fresh, at: new Date(now).toISOString(), keylog: { ...fresh.keylog, entries: undefined } };
+    await assert.rejects(stale.witness(`${base}/__witness.json`), /witness_unreadable/);
+    // A record without a publication time is stale too; one dated ahead of this clock is not.
+    published.record = { ...fresh, at: undefined };
+    await assert.rejects(createClient({ base, witness: `${base}/__witness.json` }).login(a.login, a.password), /witness_stale/);
+    published.record = { ...fresh, at: new Date(now + 3_600_000).toISOString() };
+    await createClient({ base, witness: `${base}/__witness.json` }).login(a.login, a.password);
+    // Asked for on purpose, a stale record opens the vault, and the client
+    // reports the age: the keys below its head count as published, so a
+    // conversation with a member the record covers still starts.
+    published.record = { ...fresh, at: new Date(now - 2 * ENGINE.witnessMaxAgeMs).toISOString() };
+    const asked = createClient({ base, witness: `${base}/__witness.json` });
+    await asked.login(a.login, a.password, { skipVaultCheck: true });
+    const state = (await asked.log()).witness;
+    assert.equal(state.error, "witness_stale");
+    assert.equal(state.publishedAt, published.record.at);
+    assert.ok(state.ageSeconds >= 6 * 3600, `age ${state.ageSeconds}`);
+    const w = await asked.witness(`${base}/__witness.json`);
+    assert.deepEqual([w.stale, w.keylog, w.changed], [true, "ok", []]);
+    await asked.start([b.login]);
+    // The witness command alone never needs the vault open: a stale record is
+    // reported, not refused, by a client whose vault opened on a fresh one.
+    published.record = fresh;
+    const ok = createClient({ base, witness: `${base}/__witness.json` });
+    await ok.login(b.login, b.password);
+    published.record = { ...fresh, at: new Date(now - 2 * ENGINE.witnessMaxAgeMs).toISOString() };
+    assert.equal((await ok.witness(`${base}/__witness.json`)).stale, true);
+    assert.equal((await ok.invitations()).length, 1);
   });
 });
 

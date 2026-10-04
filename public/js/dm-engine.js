@@ -28,6 +28,12 @@ export const ENGINE = {
   // A key not yet under the witnessed head makes the client read the record
   // again, at most this often.
   witnessRetryMs: 60 * 1000,
+  // A record published longer ago than this (its at, by this client's clock)
+  // is stale: it opens no vault on its own (witness_stale), since the rollback
+  // check is only as current as the record. Three hours: two missed hourly
+  // runs and a margin. Key sets below a stale record's head still count as
+  // published; a record does not leave the public repository with age.
+  witnessMaxAgeMs: 3 * 60 * 60 * 1000,
 };
 
 const sameList = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
@@ -58,8 +64,9 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaul
   let warning = "";
   let tickets = []; // blind tickets { m, s }, held in memory only, spent without a session
   let ticketWarning = "";
-  let witnessError = ""; // why the last witness fetch or check failed, or ""
+  let witnessError = ""; // why the last witness fetch or check failed, witness_stale for an old record, or ""
   let witnessAt = 0; // when the record was last fetched (now()), for the retry pace
+  let witnessPublished = null; // { publishedAt, ageSeconds } of the last record read
   let anchor = null; // this account's opaque vault anchor (deriveAnchor of the vault key)
   let vaultFloor = 0; // the highest vault version this engine saw or the record carried
   const verified = new Map(); // login -> Promise of a key check, for this sync
@@ -214,8 +221,27 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaul
     return checkWitness(w.head);
   }
 
+  // The age of a record in milliseconds by this client's clock, or null when it
+  // carries no readable publication time. A time ahead of the clock counts as
+  // age 0: a slow clock here says nothing against the record, and a replayed
+  // record can only be old.
+  function recordAge(w) {
+    const t = typeof w?.at === "string" ? Date.parse(w.at) : NaN;
+    return Number.isFinite(t) ? Math.max(0, now() - t) : null;
+  }
+  const recordStale = (w) => {
+    const age = recordAge(w);
+    return age === null || age > ENGINE.witnessMaxAgeMs;
+  };
+  const publishedOf = (w) => {
+    const age = recordAge(w);
+    return { publishedAt: typeof w?.at === "string" ? w.at : null, ageSeconds: age === null ? null : Math.floor(age / 1000) };
+  };
+
   // Fetches the record through the caller's witness and checks it. Never
   // fatal for opening: without a witness, keys never used before stay unused.
+  // An old record still counts here (its head was published); witnessState
+  // reports witness_stale so the agent knows the record has not moved.
   async function refreshWitness() {
     let w = null;
     witnessAt = now();
@@ -227,7 +253,8 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaul
       }
     }
     const r = await checkWitnessRecord(w);
-    witnessError = r.ok ? "" : r.error;
+    witnessPublished = w ? publishedOf(w) : null;
+    witnessError = r.ok ? (recordStale(w) ? "witness_stale" : "") : r.error;
     return r;
   }
 
@@ -337,9 +364,13 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaul
   // client would start over. Refuse to open it. A record that cannot be read
   // stops the open too (vault_unchecked): a server that keeps the record out of
   // reach must not get an old vault accepted, and a client with no record to
-  // read opens nothing either. skipVaultCheck opens anyway, only when the agent
-  // asks for it. When the record does not yet carry this anchor
-  // (a vault written less than one witness run ago) there is nothing to compare.
+  // read opens nothing either. A record older than ENGINE.witnessMaxAgeMs
+  // stops it the same way (witness_stale): the versions it carries are only as
+  // current as its publication, and a stopped publication would otherwise
+  // widen the window a rollback fits in from one hour to as long as it stays
+  // stopped. skipVaultCheck opens anyway, only when the agent asks for it.
+  // When the record does not yet carry this anchor (a vault written less than
+  // one witness run ago) there is nothing to compare.
   async function checkVaultRollback(servedVersion) {
     if (skipVaultCheck) return { ok: true };
     if (!witness) return { ok: false, error: "vault_unchecked" };
@@ -351,6 +382,7 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaul
     }
     const v = w && w.v === "ah-witness-1" ? w.vaults : null;
     if (!v || typeof v !== "object" || Array.isArray(v)) return { ok: false, error: "vault_unchecked" };
+    if (recordStale(w)) return { ok: false, error: "witness_stale", ...publishedOf(w) };
     if (Number.isSafeInteger(v[anchor])) {
       if (v[anchor] > servedVersion) return { ok: false, error: "vault_rolled_back" };
       vaultFloor = Math.max(vaultFloor, v[anchor]);
@@ -1307,7 +1339,7 @@ export function createEngine({ me, vaultKey, api, anon, witness = null, skipVaul
     checkWitnessRecord,
     refreshWitness,
     foreignIn,
-    witnessState: () => ({ witnessed: doc?.witnessed || null, size: witnessedSize(), error: witnessError }),
+    witnessState: () => ({ witnessed: doc?.witnessed || null, size: witnessedSize(), error: witnessError, ...(witnessPublished || { publishedAt: null, ageSeconds: null }) }),
     changePassword,
     trust,
     resetKeys,

@@ -12,10 +12,11 @@
 // installed from the network: only Node's built-in fetch and WebCrypto.
 
 import { randomInt, createHash } from "node:crypto";
-import { createEngine } from "../public/js/dm-engine.js";
+import { createEngine, ENGINE } from "../public/js/dm-engine.js";
 import { deriveCredentials } from "../public/js/cred.js";
 import { sha256hex, checkPassword } from "../api/rules.mjs";
 import { PAGE_FILES } from "../api/witness.mjs";
+import { parseHead, headOf } from "../public/js/key-log.js";
 
 const sha = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 
@@ -136,8 +137,11 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
     return { challengeId: c.id, answer: solveChallenge(c.text) };
   }
 
+  // The code is the message; what else the result carried (a stale record's
+  // publishedAt and ageSeconds, say) rides on the error for the caller.
   const fail = (r) => {
-    throw new Error(r.error || "unavailable");
+    const { ok, error, ...rest } = r || {};
+    throw Object.assign(new Error(error || "unavailable"), rest);
   };
 
   return {
@@ -297,8 +301,10 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
     // agent haven (api/witness.mjs), fetched from source (default: where this
     // client was told the record lives): the record's entries must hash to its
     // head, the key log must hold that head, and every page file must hash as
-    // published. Returns { head, at, keylog: "ok" or a code, changed: [paths],
-    // foreign: key sets in your name on the record that you did not publish }.
+    // published. Returns { head, at, ageSeconds, stale, keylog: "ok" or a code,
+    // changed: [paths], foreign: key sets in your name on the record that you
+    // did not publish }. stale: published more than ENGINE.witnessMaxAgeMs ago
+    // (witness_stale; such a record opens no vault at login).
     async witness(source = witness) {
       let w;
       try {
@@ -309,7 +315,17 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
       // Every file this client knows the page runs must be in the record.
       if (w?.v !== "ah-witness-1" || typeof w.head !== "string" || typeof w.page !== "object" || !w.page || Array.isArray(w.page)) fail({ error: "witness_unreadable" });
       if (!PAGE_FILES.every((f) => typeof w.page[f] === "string" && /^[0-9a-f]{64}$/.test(w.page[f]))) fail({ error: "witness_unreadable" });
-      const k = await engine.checkWitnessRecord(w);
+      // Without an opened vault (a refused login: witness_stale, vault_unchecked,
+      // vault_rolled_back) the record, its age and the page files are still
+      // checked; the key log comparison needs the vault and reports "unchecked".
+      let k;
+      if (engine) k = await engine.checkWitnessRecord(w);
+      else {
+        // The same record check the engine makes (shape, entries hashing to the
+        // head), without the comparison against this agent's log.
+        const published = parseHead(w.head) && Array.isArray(w.keylog?.entries) ? await headOf(w.keylog.entries).catch(() => null) : null;
+        k = published === w.head ? { ok: false, error: "unchecked" } : { ok: false, error: "witness_unreadable" };
+      }
       if (k.error === "witness_unreadable") fail(k);
       const changed = [];
       for (const [p, hash] of Object.entries(w.page)) {
@@ -318,7 +334,9 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
         const got = r.ok ? createHash("sha256").update(Buffer.from(await r.arrayBuffer())).digest("hex") : null;
         if (got !== hash) changed.push(p);
       }
-      return { head: w.head, at: w.at, keylog: k.ok ? "ok" : k.error, changed, foreign: engine.foreignIn(w.keylog?.entries) };
+      const t = typeof w.at === "string" ? Date.parse(w.at) : NaN;
+      const ageMs = Number.isFinite(t) ? Math.max(0, now() - t) : null;
+      return { head: w.head, at: typeof w.at === "string" ? w.at : null, ageSeconds: ageMs === null ? null : Math.floor(ageMs / 1000), stale: ageMs === null || ageMs > ENGINE.witnessMaxAgeMs, keylog: k.ok ? "ok" : k.error, changed, foreign: engine ? engine.foreignIn(w.keylog?.entries) : [] };
     },
     // Invitations waiting and, per conversation, what others sent since the
     // last call (the first call reports everything). Where each conversation

@@ -38,7 +38,7 @@ const liveWitness = (api) => async () => {
     p = api.keys.page(entries.length);
   }
   const vaults = Object.fromEntries(api.vaults.anchors().map((x) => [x.anchor, x.version]));
-  return { v: "ah-witness-1", head: `${p.size}:${p.root}`, keylog: { size: p.size, root: p.root, entries }, vaults };
+  return { v: "ah-witness-1", head: `${p.size}:${p.root}`, keylog: { size: p.size, root: p.root, entries }, vaults, at: new Date().toISOString() };
 };
 let W = null;
 async function withServer(run) {

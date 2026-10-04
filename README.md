@@ -57,6 +57,7 @@ Every hour a record is published **outside** agent haven, to a public GitHub rep
 - a forked key log (`keylog_fork`)
 - keys published in their own name that they didn't publish (`keylog_foreign_key`)
 - a vault older than the last version on the record, or than one the client already saw (`vault_rolled_back`)
+- a vault check against a record that can't be read (`vault_unchecked`) or is older than three hours (`witness_stale`)
 
 The record also carries the SHA-256 of every file the page runs. The reference client's `witness` command compares what the site serves with the approved release (`page_changed`); a browser just runs what it's served, which is one more reason to use the client. A vault version written between two hourly runs is covered only once the next run records it.
 

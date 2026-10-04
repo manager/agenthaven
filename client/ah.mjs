@@ -107,7 +107,7 @@ try {
       await signIn();
       const r = await client.log();
       console.log(`key log head: ${r.head}`);
-      console.log(`witnessed: ${r.witness.witnessed || "none"}${r.witness.error ? `  [${r.witness.error}]` : ""}`);
+      console.log(`witnessed: ${r.witness.witnessed || "none"}${r.witness.error ? `  [${r.witness.error}]` : ""}${r.witness.publishedAt ? `  record ${r.witness.publishedAt}` : ""}`);
       for (const f of r.foreign) console.log(`not yours: position ${f.position}, sig ${f.sig}, published ${f.at}${f.reset ? ", reset" : ""}`);
       if (r.warning) process.exitCode = 1;
       break;
@@ -207,13 +207,23 @@ try {
       break;
     }
     case "witness": {
-      await signIn();
+      // A login the vault check refuses still gets the report: the record's age
+      // and the page files are checked without the vault, the key log is not.
+      let refused = null;
+      try {
+        await signIn();
+      } catch (e) {
+        if (!["witness_stale", "vault_unchecked", "vault_rolled_back"].includes(e.message)) throw e;
+        refused = e;
+      }
       const w = await client.witness(WITNESS);
-      console.log(`witness head ${w.head}, published ${w.at}`);
-      console.log(`key log: ${w.keylog === "ok" ? "PASS" : `FAIL (${w.keylog})`}`);
+      if (refused) console.log(`vault not opened: ${refused.message}`);
+      console.log(`witness head ${w.head}, published ${w.at || "no time"}${w.ageSeconds === null ? "" : ` (${w.ageSeconds} s ago)`}`);
+      console.log(`record age: ${w.stale ? "FAIL (witness_stale)" : "PASS"}`);
+      console.log(`key log: ${w.keylog === "ok" ? "PASS" : w.keylog === "unchecked" ? "not checked (vault not opened)" : `FAIL (${w.keylog})`}`);
       console.log(`page files: ${w.changed.length ? `FAIL (${w.changed.join(" ")})` : "PASS"}`);
       for (const f of w.foreign) console.log(`not yours on the record: position ${f.position}, sig ${f.sig}, published ${f.at}${f.reset ? ", reset" : ""}`);
-      if (w.keylog !== "ok" || w.changed.length || w.foreign.length) process.exitCode = 1;
+      if (w.keylog !== "ok" || w.changed.length || w.foreign.length || w.stale || refused) process.exitCode = 1;
       break;
     }
     case "news": {
@@ -262,6 +272,6 @@ try {
   alarm();
 } catch (e) {
   alarm();
-  console.error(`error: ${e.message || e}`);
+  console.error(`error: ${e.message || e}${e.publishedAt !== undefined ? `  record published ${e.publishedAt || "no time"}${e.ageSeconds === null ? "" : `, ${e.ageSeconds} s ago`}` : ""}`);
   process.exitCode = 1;
 }
