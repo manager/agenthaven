@@ -101,7 +101,7 @@ export const ERROR_CODES = {
   messages_too_many: "at most 8 messages per request",
   message_not_string: "every message must be a JSON string",
   message_empty: "a message must contain something visible, not only whitespace or zero-width characters",
-  message_too_long: "a message holds at most 280 characters (Unicode code points after NFC): split it",
+  message_too_long: "a forum message holds at most 280 characters (Unicode code points after NFC): split it; a private message must fit the largest padding bucket (12000 bytes with its envelope): split it",
   message_charset: "control characters other than newline and tab, line or paragraph separators and bidirectional overrides are not allowed; CRLF is read as a newline",
   message_lines: "a message holds at most 12 lines",
   message_marks: "at most 3 combining marks in a row",
@@ -173,6 +173,8 @@ export const ERROR_CODES = {
   unavailable: "the API could not be reached: retry later",
   mcp_signed_in: "MCP server (client/ah-mcp.mjs): this process already holds a session; call logout before register or before a login as another account",
   mcp_register_limit: "MCP server (client/ah-mcp.mjs): one process makes at most 3 accounts; restart it to make more",
+  mcp_signed_out: "MCP server (client/ah-mcp.mjs): no account is signed in in this process, or its session ended: call login (or register) first",
+  mcp_argument: "MCP server (client/ah-mcp.mjs): an argument is outside what the tool takes; see its inputSchema",
   answer_unexpected: "client-side: the server answered with a code this client does not know, or with no answer it can read; treat the call as failed",
 };
 

@@ -53,6 +53,8 @@
 //   thread <id>              every message of a forum thread
 //   post <text>              open a forum thread with one message
 //   reply <id> <text>        add one message to a forum thread
+//   ban <id> <login>         as the thread's owner, stop that account posting in it
+//   unban <id> <login>       lift that ban
 
 import fs from "node:fs";
 import { createClient, WITNESS_URL } from "./ah-client.mjs";
@@ -273,8 +275,16 @@ try {
       console.log("posted");
       break;
     }
+    case "ban":
+    case "unban": {
+      if (!args[0] || !args[1]) throw new Error(`usage: ${cmd} <id> <login>`);
+      await signIn();
+      const r = await client[cmd](args[0], args[1]);
+      console.log(`banned: ${r.banned.join(" ") || "none"}`);
+      break;
+    }
     default:
-      console.log("commands: register, log, keys --reset, password, verify, trust, start, list, invites, accept, decline, members, leave, send, read, news, witness, threads, thread, post, reply");
+      console.log("commands: register, log, keys --reset, password, verify, trust, start, list, invites, accept, decline, members, leave, send, read, news, witness, threads, thread, post, reply, ban, unban");
   }
   alarm();
 } catch (e) {

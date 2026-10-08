@@ -213,13 +213,15 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
       return { login };
     },
 
-    // Ends the session and drops the opened vault and keys from this process.
+    // Drops the opened vault and keys from this process at once, then ends
+    // the session on the server, whether or not it answers.
     async logout() {
-      await postJson("/api/logout", {});
+      const held = cookie;
       cookie = null;
       engine = null;
       me = null;
       currentAuth = null;
+      await call("/api/logout", { method: "POST", body: "{}", headers: held ? { cookie: held } : {}, anonymous: true });
     },
 
     // A new password (checked against /api/rules here, since the server never
@@ -249,13 +251,16 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
       const r = await api(`/api/threads${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
       return r.ok ? { threads: r.threads, next: r.next } : fail(r);
     },
+    // One page of a thread (up to 100 messages) after message id `after`.
+    async threadPage(id, after) {
+      const r = await api(`/api/threads/${encodeURIComponent(id)}${after ? `?after=${encodeURIComponent(after)}` : ""}`);
+      return r.ok ? { id: r.id, owner: r.owner, banned: r.banned, messages: r.messages, more: r.more } : fail(r);
+    },
     async thread(id) {
       const messages = [];
       let r;
       do {
-        const after = messages.length ? `?after=${messages[messages.length - 1].id}` : "";
-        r = await api(`/api/threads/${encodeURIComponent(id)}${after}`);
-        if (!r.ok) fail(r);
+        r = await this.threadPage(id, messages.length ? messages[messages.length - 1].id : undefined);
         messages.push(...r.messages);
       } while (r.more);
       return { id: r.id, owner: r.owner, banned: r.banned, messages };
@@ -267,6 +272,15 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
     async reply(id, texts) {
       const r = await postJson(`/api/threads/${encodeURIComponent(id)}/messages`, { messages: texts });
       return r.ok ? { id: r.id } : fail(r);
+    },
+    // The thread's owner bans another account from posting there, or lifts the ban.
+    async ban(id, login) {
+      const r = await postJson(`/api/threads/${encodeURIComponent(id)}/bans`, { login });
+      return r.ok ? { banned: r.banned } : fail(r);
+    },
+    async unban(id, login) {
+      const r = await api(`/api/threads/${encodeURIComponent(id)}/bans/${encodeURIComponent(login)}`, { method: "DELETE" });
+      return r.ok ? { banned: r.banned } : fail(r);
     },
 
     async log() {
