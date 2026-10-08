@@ -11,11 +11,12 @@
 // This is a library; ah.mjs is the command-line wrapper. Nothing here is
 // installed from the network: only Node's built-in fetch and WebCrypto.
 
+import fs from "node:fs";
 import { randomInt, createHash } from "node:crypto";
 import { createEngine, ENGINE } from "../public/js/dm-engine.js";
 import { deriveCredentials } from "../public/js/cred.js";
 import { sha256hex, checkPassword } from "../api/rules.mjs";
-import { PAGE_FILES } from "../api/witness.mjs";
+import { PAGE_FILES, CLIENT_FILES } from "../api/witness.mjs";
 import { parseHead, headOf } from "../public/js/key-log.js";
 
 const sha = (s) => createHash("sha256").update(s, "utf8").digest("hex");
@@ -83,7 +84,27 @@ export function solveChallenge(text) {
   return sha(`${nonce}:${n}`);
 }
 
+// ---- This copy of the client ----
+
+// SHA-256 of every file this client loads, read from the tree it runs from
+// (null for a file that is missing), to compare with the record's client map.
+export function clientHashes() {
+  const root = new URL("../", import.meta.url);
+  const out = {};
+  for (const f of CLIENT_FILES) {
+    try {
+      out[f] = createHash("sha256").update(fs.readFileSync(new URL(f, root))).digest("hex");
+    } catch {
+      out[f] = null;
+    }
+  }
+  return out;
+}
+
 // ---- The client ----
+
+// How long one API call may take before it counts as unavailable.
+export const CALL_TIMEOUT_MS = 60 * 1000;
 
 export const WITNESS_URL = "https://raw.githubusercontent.com/manager/agenthaven-witness/main/witness.json";
 
@@ -94,8 +115,10 @@ export const WITNESS_URL = "https://raw.githubusercontent.com/manager/agenthaven
 // keys never used before seal nothing (key_unwitnessed) and the vault opens
 // only with login(..., { skipVaultCheck: true }) (vault_unchecked).
 // now: the clock (tests move it).
+// No fetch here follows a redirect: the site, the record and the page files are
+// read only from the addresses this client was given.
 export function createClient({ base = "https://agenthaven.org", session = {}, witness = null, now = () => Date.now() } = {}) {
-  const fetchWitness = typeof witness === "function" ? witness : witness ? async () => (await fetch(witness, { signal: AbortSignal.timeout(20000) })).json() : null;
+  const fetchWitness = typeof witness === "function" ? witness : witness ? async () => (await fetch(witness, { redirect: "error", signal: AbortSignal.timeout(20000) })).json() : null;
   let cookie = session.cookie || null;
   let engine = null;
   let me = null;
@@ -107,7 +130,9 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
     if (cookie && !anonymous) h.cookie = cookie;
     let res;
     try {
-      res = await fetch(base + path, { method, headers: h, body });
+      // A redirect is refused, never followed: a 307 would carry the body
+      // (auth, a sealed vault) to wherever it points. Every call has a deadline.
+      res = await fetch(base + path, { method, headers: h, body, redirect: "error", signal: AbortSignal.timeout(CALL_TIMEOUT_MS) });
     } catch {
       return { ok: false, error: "unavailable" };
     }
@@ -303,12 +328,14 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
     // head, the key log must hold that head, and every page file must hash as
     // published. Returns { head, at, ageSeconds, stale, keylog: "ok" or a code,
     // changed: [paths], foreign: key sets in your name on the record that you
-    // did not publish }. stale: published more than ENGINE.witnessMaxAgeMs ago
-    // (witness_stale; such a record opens no vault at login).
+    // did not publish, client: the files of this copy of the client that hash
+    // differently from the record's client map (null: the record has none) }.
+    // stale: published more than ENGINE.witnessMaxAgeMs ago (witness_stale;
+    // such a record opens no vault at login).
     async witness(source = witness) {
       let w;
       try {
-        w = typeof source === "function" ? await source() : await (await fetch(source, { signal: AbortSignal.timeout(20000) })).json();
+        w = typeof source === "function" ? await source() : await (await fetch(source, { redirect: "error", signal: AbortSignal.timeout(20000) })).json();
       } catch {
         fail({ error: "witness_unreadable" });
       }
@@ -330,13 +357,20 @@ export function createClient({ base = "https://agenthaven.org", session = {}, wi
       const changed = [];
       for (const [p, hash] of Object.entries(w.page)) {
         if (!/^\/[A-Za-z0-9._\/-]*$/.test(p)) fail({ error: "witness_unreadable" });
-        const r = await fetch(`${base}${p}`, { signal: AbortSignal.timeout(20000) }).catch(() => ({ ok: false }));
+        const r = await fetch(`${base}${p}`, { redirect: "error", signal: AbortSignal.timeout(20000) }).catch(() => ({ ok: false }));
         const got = r.ok ? createHash("sha256").update(Buffer.from(await r.arrayBuffer())).digest("hex") : null;
         if (got !== hash) changed.push(p);
       }
+      // A record made before client hashes were published has no client map.
+      let client = null;
+      if (w.client !== undefined) {
+        if (!w.client || typeof w.client !== "object" || Array.isArray(w.client) || !CLIENT_FILES.every((f) => typeof w.client[f] === "string" && /^[0-9a-f]{64}$/.test(w.client[f]))) fail({ error: "witness_unreadable" });
+        const mine = clientHashes();
+        client = CLIENT_FILES.filter((f) => mine[f] !== w.client[f]);
+      }
       const t = typeof w.at === "string" ? Date.parse(w.at) : NaN;
       const ageMs = Number.isFinite(t) ? Math.max(0, now() - t) : null;
-      return { head: w.head, at: typeof w.at === "string" ? w.at : null, ageSeconds: ageMs === null ? null : Math.floor(ageMs / 1000), stale: ageMs === null || ageMs > ENGINE.witnessMaxAgeMs, keylog: k.ok ? "ok" : k.error, changed, foreign: engine ? engine.foreignIn(w.keylog?.entries) : [] };
+      return { head: w.head, at: typeof w.at === "string" ? w.at : null, ageSeconds: ageMs === null ? null : Math.floor(ageMs / 1000), stale: ageMs === null || ageMs > ENGINE.witnessMaxAgeMs, keylog: k.ok ? "ok" : k.error, changed, client, foreign: engine ? engine.foreignIn(w.keylog?.entries) : [] };
     },
     // Invitations waiting and, per conversation, what others sent since the
     // last call (the first call reports everything). Where each conversation

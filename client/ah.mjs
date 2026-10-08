@@ -44,8 +44,9 @@
 //   leave <id> [login]       remove that member, or yourself if login is omitted
 //   send <id> <text>         seal and send one message
 //   read <id>                decrypt a conversation
-//   witness                  compare the key log and every page file with the
-//                            published witness record; exits 1 on any mismatch
+//   witness                  compare the key log, every page file and the files of
+//                            this client with the published witness record;
+//                            exits 1 on any mismatch
 //   news                     invitations waiting, then what others sent in each
 //                            conversation since you last ran news
 //   threads [cursor]         forum threads, latest activity first (public, not encrypted)
@@ -209,21 +210,27 @@ try {
     case "witness": {
       // A login the vault check refuses still gets the report: the record's age
       // and the page files are checked without the vault, the key log is not.
+      // Without AH_LOGIN and AH_PASSWORD nothing signs in: the record, the page
+      // files and the client files are checked, the key log is not.
       let refused = null;
-      try {
-        await signIn();
-      } catch (e) {
-        if (!["witness_stale", "vault_unchecked", "vault_rolled_back"].includes(e.message)) throw e;
-        refused = e;
+      const signingIn = Boolean(process.env.AH_LOGIN && process.env.AH_PASSWORD);
+      if (signingIn) {
+        try {
+          await signIn();
+        } catch (e) {
+          if (!["witness_stale", "vault_unchecked", "vault_rolled_back"].includes(e.message)) throw e;
+          refused = e;
+        }
       }
       const w = await client.witness(WITNESS);
       if (refused) console.log(`vault not opened: ${refused.message}`);
       console.log(`witness head ${w.head}, published ${w.at || "no time"}${w.ageSeconds === null ? "" : ` (${w.ageSeconds} s ago)`}`);
       console.log(`record age: ${w.stale ? "FAIL (witness_stale)" : "PASS"}`);
-      console.log(`key log: ${w.keylog === "ok" ? "PASS" : w.keylog === "unchecked" ? "not checked (vault not opened)" : `FAIL (${w.keylog})`}`);
+      console.log(`key log: ${w.keylog === "ok" ? "PASS" : w.keylog === "unchecked" ? `not checked (${signingIn ? "vault not opened" : "no AH_LOGIN"})` : `FAIL (${w.keylog})`}`);
       console.log(`page files: ${w.changed.length ? `FAIL (${w.changed.join(" ")})` : "PASS"}`);
+      console.log(`client files: ${w.client === null ? "not on the record" : w.client.length ? `FAIL (${w.client.join(" ")})` : "PASS"}`);
       for (const f of w.foreign) console.log(`not yours on the record: position ${f.position}, sig ${f.sig}, published ${f.at}${f.reset ? ", reset" : ""}`);
-      if (w.keylog !== "ok" || w.changed.length || w.foreign.length || w.stale || refused) process.exitCode = 1;
+      if ((signingIn ? w.keylog !== "ok" : w.keylog !== "unchecked") || w.changed.length || w.client?.length || w.foreign.length || w.stale || refused) process.exitCode = 1;
       break;
     }
     case "news": {

@@ -13,6 +13,9 @@
 //           head (dm-engine.js, key_unwitnessed)
 //   page    SHA-256 of every file the page runs, and of the agent instructions
 //           (llms.txt, llms-full.txt, skill/SKILL.md), as approved at release
+//   client  SHA-256 of every file the reference client and its MCP server load
+//           from the public source (CLIENT_FILES), as approved at release; the
+//           site does not serve them, so an agent compares its own copy
 //
 // Page hashes are never taken from what the site serves: a changed page would
 // then publish itself as the approved one (GPT review 2026-09-26). They come
@@ -77,6 +80,27 @@ export const PAGE_FILES = [
   "/skill/SKILL.md",
 ];
 
+// Every file the reference client (client/ah.mjs) and the MCP server
+// (client/ah-mcp.mjs) load, as paths in the public source. An agent that cloned
+// it compares its copy with the record (ah.mjs witness, the MCP witness tool).
+// tests/witness.test.mjs fails if the import graph of either entry point
+// drifts from this list.
+export const CLIENT_FILES = [
+  "client/ah-mcp.mjs",
+  "client/ah.mjs",
+  "client/ah-client.mjs",
+  "public/js/dm-engine.js",
+  "public/js/dm-crypto.js",
+  "public/js/key-log.js",
+  "public/js/cred.js",
+  "public/js/tickets.js",
+  "api/rules.mjs",
+  "api/witness.mjs",
+  "api/dm.mjs",
+  "api/jsonl.mjs",
+  "api/vault.mjs",
+];
+
 const sha = (...parts) => {
   const h = createHash("sha256");
   for (const p of parts) h.update(p);
@@ -115,16 +139,19 @@ export async function readLog(page) {
 }
 
 const HEX64 = /^[0-9a-f]{64}$/;
+const clientOk = (a) => a?.client && typeof a.client === "object" && CLIENT_FILES.every((f) => HEX64.test(a.client[f] ?? ""));
 const approvedOk = (a) => a?.v === WITNESS.approved && a.page && typeof a.page === "object" && PAGE_FILES.every((f) => HEX64.test(a.page[f] ?? ""));
 
-// The approved record, from the page files in a source tree (public/).
+// The approved record, from the page files in a source tree (public/) and the
+// client files in the tree around it.
 export function approve(publicDir, now = () => Date.now()) {
+  const hash = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
   const page = {};
-  for (const p of PAGE_FILES) {
-    const file = path.join(publicDir, p.endsWith("/") ? `${p}index.html` : p);
-    page[p] = createHash("sha256").update(fs.readFileSync(file)).digest("hex");
-  }
-  return { v: WITNESS.approved, page, at: new Date(now()).toISOString() };
+  for (const p of PAGE_FILES) page[p] = hash(path.join(publicDir, p.endsWith("/") ? `${p}index.html` : p));
+  const root = path.resolve(publicDir, "..");
+  const client = {};
+  for (const f of CLIENT_FILES) client[f] = hash(path.join(root, f));
+  return { v: WITNESS.approved, page, client, at: new Date(now()).toISOString() };
 }
 
 export async function pageHashes(fetchBytes) {
@@ -182,7 +209,10 @@ export async function witness({ last, approved, page, fetchBytes, vaultAnchors =
   const changed = PAGE_FILES.filter((f) => served[f] !== approved.page[f]);
   if (changed.length) return { code: 2, record: { v: WITNESS.version, alarm: "page_changed", changed, at } };
   const pageAt = approved.at;
-  return { code: 0, record: { v: WITNESS.version, keylog, head: `${keylog.size}:${keylog.root}`, vaults, page: Object.fromEntries(PAGE_FILES.map((f) => [f, approved.page[f]])), approvedAt: pageAt, at } };
+  // Client hashes are published as approved; an approval made before they
+  // existed publishes none.
+  const client = clientOk(approved) ? { client: Object.fromEntries(CLIENT_FILES.map((f) => [f, approved.client[f]])) } : {};
+  return { code: 0, record: { v: WITNESS.version, keylog, head: `${keylog.size}:${keylog.root}`, vaults, page: Object.fromEntries(PAGE_FILES.map((f) => [f, approved.page[f]])), ...client, approvedAt: pageAt, at } };
 }
 
 async function main() {

@@ -7,7 +7,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { createApi } from "../api/server.mjs";
-import { PAGE_FILES, approve, witness } from "../api/witness.mjs";
+import { PAGE_FILES, CLIENT_FILES, approve, witness } from "../api/witness.mjs";
 import { createClient } from "../client/ah-client.mjs";
 import * as dm from "../public/js/dm-crypto.js";
 import { headOf } from "../public/js/key-log.js";
@@ -137,7 +137,7 @@ test("the reference client checks its key log and the page files against the wit
     const source = `${base}/__witness.json`;
     const w = await a.c.witness(source);
     assert.ok(Number.isSafeInteger(w.ageSeconds) && w.ageSeconds < 60, `age ${w.ageSeconds}`);
-    assert.deepEqual({ ...w, ageSeconds: 0 }, { head: published.record.head, at: published.record.at, ageSeconds: 0, stale: false, keylog: "ok", changed: [], foreign: [] });
+    assert.deepEqual({ ...w, ageSeconds: 0 }, { head: published.record.head, at: published.record.at, ageSeconds: 0, stale: false, keylog: "ok", changed: [], client: [], foreign: [] });
     // The record carries the whole log, hashing to its head; entries that do not are no witness.
     assert.equal(published.record.keylog.entries.length, 2);
     const full0 = published.record;
@@ -471,5 +471,34 @@ test("the record shows an agent every key set in its name, including one it did 
     const w = await a.c.witness(`${base}/__witness.json`);
     assert.equal(w.keylog, "ok");
     assert.deepEqual(w.foreign.map((f) => [f.position, f.reset]), [[1, true]]);
+  });
+});
+
+test("CLIENT_FILES is every file the reference client and the MCP server load", () => {
+  const root = new URL("../", import.meta.url).pathname;
+  const seen = new Set();
+  const walk = (f) => {
+    if (seen.has(f)) return;
+    seen.add(f);
+    const src = fs.readFileSync(path.join(root, f), "utf8");
+    for (const m of src.matchAll(/(?:^|\n)\s*(?:import|export)[^;]*?from\s+"(\.[^"]+)"|import\(\s*"(\.[^"]+)"\s*\)/g)) {
+      walk(path.relative(root, path.resolve(path.dirname(path.join(root, f)), m[1] || m[2])));
+    }
+  };
+  walk("client/ah.mjs");
+  walk("client/ah-mcp.mjs");
+  assert.deepEqual([...seen].sort(), [...CLIENT_FILES].sort());
+});
+
+test("the record publishes the approved client hashes, and none when the approval has none", async () => {
+  await withSite(async ({ io }) => {
+    assert.deepEqual(Object.keys(io.approved.client).sort(), [...CLIENT_FILES].sort());
+    const r = await witness({ last: null, ...io });
+    assert.equal(r.code, 0);
+    assert.deepEqual(r.record.client, io.approved.client);
+    const { client, ...old } = io.approved;
+    const r2 = await witness({ last: null, ...io, approved: old });
+    assert.equal(r2.code, 0);
+    assert.equal(r2.record.client, undefined);
   });
 });
