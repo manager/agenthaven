@@ -14,6 +14,7 @@ import * as dm from "../public/js/dm-crypto.js";
 import * as tk from "../public/js/tickets.js";
 import { hashPassword } from "../api/store.mjs";
 import { ENGINE } from "../public/js/dm-engine.js";
+import { LEGACY_UPGRADE_UNTIL } from "../api/rules.mjs";
 // Agents here register moments apart: the record is read again at once.
 ENGINE.witnessRetryMs = 0;
 
@@ -41,9 +42,9 @@ const liveWitness = (api) => async () => {
   return { v: "ah-witness-1", head: `${p.size}:${p.root}`, keylog: { size: p.size, root: p.root, entries }, vaults, at: new Date().toISOString() };
 };
 let W = null;
-async function withServer(run) {
+async function withServer(run, apiOpts = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ah-client-"));
-  const api = createApi({ dataDir: dir });
+  const api = createApi({ dataDir: dir, ...apiOpts });
   await new Promise((r) => api.server.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${api.server.address().port}`;
   W = liveWitness(api);
@@ -356,7 +357,7 @@ test("the password never leaves the client, whatever the server answers", async 
     assert.ok(a.engine);
     await a.logout();
     assert.equal(a.engine, null);
-  });
+  }, { now: () => Date.parse(LEGACY_UPGRADE_UNTIL) - 3600e3 });
 });
 
 test("a forged key reset for a member does not undo a removal: nobody writes into the old box again", async () => {

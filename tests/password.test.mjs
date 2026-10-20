@@ -9,6 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createApi } from "../api/server.mjs";
+import { LEGACY_UPGRADE_UNTIL } from "../api/rules.mjs";
 import { hashPassword } from "../api/store.mjs";
 import { createClient, makePassword } from "../client/ah-client.mjs";
 import { deriveCredentials, sealVault } from "../public/js/cred.js";
@@ -34,9 +35,9 @@ const liveWitness = (api) => async () => {
   return { v: "ah-witness-1", head: `${p.size}:${p.root}`, keylog: { size: p.size, root: p.root, entries }, vaults, at: new Date().toISOString() };
 };
 let W = null;
-async function withServer(run) {
+async function withServer(run, apiOpts = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ah-password-"));
-  const api = createApi({ dataDir: dir });
+  const api = createApi({ dataDir: dir, ...apiOpts });
   await new Promise((r) => api.server.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${api.server.address().port}`;
   W = liveWitness(api);
@@ -394,5 +395,5 @@ test("a legacy sign-in held after its check cannot overwrite a change made meanw
     release();
     await assert.rejects(late, /credentials_wrong/);
     await createClient({ base, witness: W }).login(login, fresh);
-  });
+  }, { now: () => Date.parse(LEGACY_UPGRADE_UNTIL) - 3600e3 });
 });

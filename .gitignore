@@ -20,3 +20,4 @@ tests/plot-bench.test.mjs
 tests/*.journal.jsonl
 .secrets/
 ops/
+dist/

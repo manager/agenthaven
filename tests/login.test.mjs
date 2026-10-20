@@ -132,7 +132,8 @@ test("rules document keeps login rules and describes sign-in", () => {
 
 test("an account from before ah-cred-1 moves to its auth key on one sign-in with the password", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ah-upgrade-"));
-  const api = createApi({ dataDir: dir });
+  // An hour before the move closed, so the test keeps its meaning after LEGACY_UPGRADE_UNTIL.
+  const api = createApi({ dataDir: dir, now: () => Date.parse(LEGACY_UPGRADE_UNTIL) - 3600e3 });
   await new Promise((r) => api.server.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${api.server.address().port}`;
   const signIn = async (body) => {
